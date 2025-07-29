@@ -1,10 +1,20 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, TrendingUp, MousePointer, Users } from "lucide-react";
 import { useState } from "react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const TrafficOverview = () => {
-  const [dateRange, setDateRange] = useState("07/15/2025 - 07/29/2025");
+  const [startDate, setStartDate] = useState<Date>(new Date(2025, 6, 15)); // July 15, 2025
+  const [endDate, setEndDate] = useState<Date>(new Date(2025, 6, 29)); // July 29, 2025
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+
+  const formatDateRange = (start: Date, end: Date) => {
+    return `${format(start, "MM/dd/yyyy")} - ${format(end, "MM/dd/yyyy")}`;
+  };
 
   // Sample chart data with more interesting values
   const chartData = [
@@ -36,14 +46,52 @@ const TrafficOverview = () => {
           </h2>
           <p className="text-muted-foreground mt-1">Monitor your link performance in real-time</p>
         </div>
-        <Button 
-          variant="outline" 
-          className="flex items-center space-x-2 w-fit hover-lift hover:border-primary transition-all duration-300 group"
-          onClick={() => setDateRange("07/15/2025 - 07/29/2025")}
-        >
-          <CalendarDays className="w-4 h-4 group-hover:text-primary transition-colors" />
-          <span className="text-sm font-medium">{dateRange}</span>
-        </Button>
+        
+        {/* Working Date Range Picker */}
+        <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+          <PopoverTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="flex items-center space-x-2 w-fit hover-lift hover:border-primary transition-all duration-300 group"
+            >
+              <CalendarDays className="w-4 h-4 group-hover:text-primary transition-colors" />
+              <span className="text-sm font-medium">{formatDateRange(startDate, endDate)}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 bg-card border-card-border shadow-lg z-50" align="start">
+            <div className="p-4 space-y-4">
+              <div className="text-sm font-medium text-card-foreground">Select Date Range</div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">Start Date</label>
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(date) => date && setStartDate(date)}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">End Date</label>
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={(date) => date && setEndDate(date)}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" size="sm" onClick={() => setIsDatePickerOpen(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={() => setIsDatePickerOpen(false)}>
+                  Apply
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Metrics Cards */}

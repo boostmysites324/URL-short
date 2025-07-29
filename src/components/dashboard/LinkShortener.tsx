@@ -1,13 +1,24 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 const LinkShortener = () => {
   const [inputUrl, setInputUrl] = useState("");
   const [mode, setMode] = useState<"single" | "multiple">("single");
+  const [isLoading, setIsLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [settings, setSettings] = useState({
+    customDomain: false,
+    analytics: true,
+    expiration: false,
+    password: false
+  });
   const [shortenedLinks, setShortenedLinks] = useState([
     {
       id: 1,
@@ -29,7 +40,17 @@ const LinkShortener = () => {
   
   const { toast } = useToast();
 
-  const handleShorten = () => {
+  // URL validation function
+  const isValidUrl = (string: string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const handleShorten = async () => {
     if (!inputUrl.trim()) {
       toast({
         title: "Error",
@@ -39,29 +60,54 @@ const LinkShortener = () => {
       return;
     }
 
-    // Simple URL shortening simulation
-    const newLink = {
-      id: Date.now(),
-      original: inputUrl,
-      shortened: `https://short.ly/${Math.random().toString(36).substr(2, 8)}`,
-      clicks: 0,
-      uniqueClicks: 0,
-      created: "Just now"
-    };
+    if (!isValidUrl(inputUrl)) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid URL (e.g., https://example.com)",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    setShortenedLinks([newLink, ...shortenedLinks]);
-    setInputUrl("");
-    
-    toast({
-      title: "Success",
-      description: "Link shortened successfully!",
-    });
+    setIsLoading(true);
+
+    // Simulate API call delay
+    setTimeout(() => {
+      const domains = ["short.ly", "tiny.url", "bit.ly", "s.link"];
+      const randomDomain = domains[Math.floor(Math.random() * domains.length)];
+      const shortCode = Math.random().toString(36).substr(2, 8);
+      
+      const newLink = {
+        id: Date.now(),
+        original: inputUrl,
+        shortened: `https://${randomDomain}/${shortCode}`,
+        clicks: 0,
+        uniqueClicks: 0,
+        created: "Just now"
+      };
+
+      setShortenedLinks([newLink, ...shortenedLinks]);
+      setInputUrl("");
+      setIsLoading(false);
+      
+      toast({
+        title: "Success!",
+        description: "Link shortened successfully and copied to clipboard",
+      });
+
+      // Auto copy to clipboard
+      copyToClipboard(newLink.shortened);
+    }, 1500);
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, linkId?: number) => {
     navigator.clipboard.writeText(text);
+    if (linkId) {
+      setCopiedId(linkId);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
     toast({
-      title: "Copied",
+      title: "Copied!",
       description: "Link copied to clipboard",
     });
   };
@@ -105,14 +151,91 @@ const LinkShortener = () => {
               <Button 
                 onClick={handleShorten}
                 className="h-12 px-8 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary shadow-lg hover:shadow-glow transition-all duration-300 group"
-                disabled={!inputUrl.trim()}
+                disabled={!inputUrl.trim() || isLoading}
               >
-                <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                Shorten
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                    Shorten
+                  </>
+                )}
               </Button>
-              <Button variant="outline" className="h-12 w-12 p-0 hover-lift">
-                <Settings className="w-4 h-4" />
-              </Button>
+              
+              {/* Working Settings Dialog */}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="h-12 w-12 p-0 hover-lift">
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md bg-card border-card-border">
+                  <DialogHeader>
+                    <DialogTitle className="text-card-foreground">Link Settings</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="custom-domain" className="text-sm font-medium text-card-foreground">
+                        Use Custom Domain
+                      </Label>
+                      <Switch 
+                        id="custom-domain"
+                        checked={settings.customDomain}
+                        onCheckedChange={(checked) => setSettings({...settings, customDomain: checked})}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="analytics" className="text-sm font-medium text-card-foreground">
+                        Enable Analytics
+                      </Label>
+                      <Switch 
+                        id="analytics"
+                        checked={settings.analytics}
+                        onCheckedChange={(checked) => setSettings({...settings, analytics: checked})}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="expiration" className="text-sm font-medium text-card-foreground">
+                        Set Expiration
+                      </Label>
+                      <Switch 
+                        id="expiration"
+                        checked={settings.expiration}
+                        onCheckedChange={(checked) => setSettings({...settings, expiration: checked})}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password" className="text-sm font-medium text-card-foreground">
+                        Password Protection
+                      </Label>
+                      <Switch 
+                        id="password"
+                        checked={settings.password}
+                        onCheckedChange={(checked) => setSettings({...settings, password: checked})}
+                      />
+                    </div>
+                    
+                    <Button 
+                      className="w-full" 
+                      onClick={() => {
+                        toast({
+                          title: "Settings Saved",
+                          description: "Your link settings have been updated successfully.",
+                        });
+                      }}
+                    >
+                      Save Settings
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 
@@ -209,11 +332,20 @@ const LinkShortener = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => copyToClipboard(link.shortened)}
+                  onClick={() => copyToClipboard(link.shortened, link.id)}
                   className="flex items-center space-x-2 hover-lift hover:border-primary group-hover:shadow-md transition-all duration-300"
                 >
-                  <Copy className="w-4 h-4" />
-                  <span className="font-medium">Copy</span>
+                  {copiedId === link.id ? (
+                    <>
+                      <Check className="w-4 h-4 text-success" />
+                      <span className="font-medium text-success">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span className="font-medium">Copy</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
