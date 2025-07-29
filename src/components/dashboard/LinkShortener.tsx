@@ -35,6 +35,8 @@ const LinkShortener = () => {
   };
 
   const handleShorten = async () => {
+    console.log('handleShorten called with:', inputUrl);
+    
     if (!inputUrl.trim()) {
       toast({
         title: "Error",
@@ -54,6 +56,7 @@ const LinkShortener = () => {
     }
 
     try {
+      console.log('About to call shortenUrl with:', inputUrl);
       const linkSettings = {
         customDomain: settings.customDomain ? "short.ly" : undefined,
         analyticsEnabled: settings.analytics,
@@ -61,7 +64,9 @@ const LinkShortener = () => {
         password: settings.password ? "password123" : undefined
       };
 
+      console.log('Link settings:', linkSettings);
       const result = await shortenUrl(inputUrl, linkSettings);
+      console.log('shortenUrl result:', result);
       
       if (result) {
         setInputUrl("");
@@ -69,8 +74,8 @@ const LinkShortener = () => {
         copyToClipboard(result.shortUrl, result.id);
       }
     } catch (error) {
+      console.error('Failed to shorten URL in component:', error);
       // Error handling is done in the hook
-      console.error('Failed to shorten URL:', error);
     }
   };
 

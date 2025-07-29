@@ -13,12 +13,15 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Shorten URL function called with:', req.method, req.url);
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { url, customDomain, expiresAt, password, analyticsEnabled } = await req.json();
+    const requestBody = await req.json();
+    console.log('Request body:', requestBody);
+    const { url, customDomain, expiresAt, password, analyticsEnabled } = requestBody;
 
     if (!url) {
       return new Response(
