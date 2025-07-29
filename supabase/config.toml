@@ -1,1 +1,10 @@
 project_id = "ozkuefljvpzpmbrkknfw"
+
+[functions.shorten-url]
+verify_jwt = false
+
+[functions.track-click]
+verify_jwt = false
+
+[functions.redirect]
+verify_jwt = false

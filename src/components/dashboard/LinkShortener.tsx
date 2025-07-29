@@ -7,38 +7,22 @@ import { Switch } from "@/components/ui/switch";
 import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useLinks } from "@/hooks/useLinks";
+import { format } from "date-fns";
 
 const LinkShortener = () => {
   const [inputUrl, setInputUrl] = useState("");
   const [mode, setMode] = useState<"single" | "multiple">("single");
-  const [isLoading, setIsLoading] = useState(false);
-  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [settings, setSettings] = useState({
     customDomain: false,
     analytics: true,
     expiration: false,
     password: false
   });
-  const [shortenedLinks, setShortenedLinks] = useState([
-    {
-      id: 1,
-      original: "https://b2u.io/Betbhai",
-      shortened: "https://wa.me/919897879056?text=Hi%2C%20I%20need%2...",
-      clicks: 55,
-      uniqueClicks: 55,
-      created: "2 months ago"
-    },
-    {
-      id: 2,
-      original: "https://b2u.io/Tiger",
-      shortened: "https://wa.me/919897879056?text=Hi%2C%20I%20need%2...",
-      clicks: 1136,
-      uniqueClicks: 1017,
-      created: "2 months ago"
-    }
-  ]);
   
   const { toast } = useToast();
+  const { links, loading, shortenUrl } = useLinks();
 
   // URL validation function
   const isValidUrl = (string: string) => {
@@ -69,38 +53,28 @@ const LinkShortener = () => {
       return;
     }
 
-    setIsLoading(true);
-
-    // Simulate API call delay
-    setTimeout(() => {
-      const domains = ["short.ly", "tiny.url", "bit.ly", "s.link"];
-      const randomDomain = domains[Math.floor(Math.random() * domains.length)];
-      const shortCode = Math.random().toString(36).substr(2, 8);
-      
-      const newLink = {
-        id: Date.now(),
-        original: inputUrl,
-        shortened: `https://${randomDomain}/${shortCode}`,
-        clicks: 0,
-        uniqueClicks: 0,
-        created: "Just now"
+    try {
+      const linkSettings = {
+        customDomain: settings.customDomain ? "short.ly" : undefined,
+        analyticsEnabled: settings.analytics,
+        expiresAt: settings.expiration ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
+        password: settings.password ? "password123" : undefined
       };
 
-      setShortenedLinks([newLink, ...shortenedLinks]);
-      setInputUrl("");
-      setIsLoading(false);
+      const result = await shortenUrl(inputUrl, linkSettings);
       
-      toast({
-        title: "Success!",
-        description: "Link shortened successfully and copied to clipboard",
-      });
-
-      // Auto copy to clipboard
-      copyToClipboard(newLink.shortened);
-    }, 1500);
+      if (result) {
+        setInputUrl("");
+        // Auto copy to clipboard
+        copyToClipboard(result.shortUrl, result.id);
+      }
+    } catch (error) {
+      // Error handling is done in the hook
+      console.error('Failed to shorten URL:', error);
+    }
   };
 
-  const copyToClipboard = (text: string, linkId?: number) => {
+  const copyToClipboard = (text: string, linkId?: string) => {
     navigator.clipboard.writeText(text);
     if (linkId) {
       setCopiedId(linkId);
@@ -151,9 +125,9 @@ const LinkShortener = () => {
               <Button 
                 onClick={handleShorten}
                 className="h-12 px-8 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary shadow-lg hover:shadow-glow transition-all duration-300 group"
-                disabled={!inputUrl.trim() || isLoading}
+                disabled={!inputUrl.trim() || loading}
               >
-                {isLoading ? (
+                {loading ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Processing...</span>
@@ -284,72 +258,85 @@ const LinkShortener = () => {
         </div>
         
         <div className="divide-y divide-card-border">
-          {shortenedLinks.map((link, index) => (
-            <div key={link.id} className="p-6 hover:bg-surface-secondary/50 transition-all duration-300 group interactive-card" style={{animationDelay: `${index * 0.1}s`}}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-success rounded-full animate-pulse-custom"></div>
-                      <span className="text-xs font-medium text-success bg-success/10 px-2 py-1 rounded-full">
-                        Active
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      <span>{link.created}</span>
-                    </div>
-                  </div>
-                  
-                  <a 
-                    href={link.shortened} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:text-primary-dark font-semibold text-lg truncate flex items-center space-x-2 group-hover:underline transition-all duration-300"
-                  >
-                    <span className="truncate">{link.shortened}</span>
-                    <ExternalLink className="w-4 h-4 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                  </a>
-                  
-                  <p className="text-sm text-muted-foreground truncate mt-1 group-hover:text-card-foreground transition-colors">
-                    {link.original}
-                  </p>
-                  
-                  <div className="flex items-center space-x-6 mt-3">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <span className="text-sm font-medium text-card-foreground">{link.clicks}</span>
-                      <span className="text-xs text-muted-foreground">Total Clicks</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-success rounded-full"></div>
-                      <span className="text-sm font-medium text-card-foreground">{link.uniqueClicks}</span>
-                      <span className="text-xs text-muted-foreground">Unique</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(link.shortened, link.id)}
-                  className="flex items-center space-x-2 hover-lift hover:border-primary group-hover:shadow-md transition-all duration-300"
-                >
-                  {copiedId === link.id ? (
-                    <>
-                      <Check className="w-4 h-4 text-success" />
-                      <span className="font-medium text-success">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      <span className="font-medium">Copy</span>
-                    </>
-                  )}
-                </Button>
-              </div>
+          {links.length === 0 ? (
+            <div className="p-8 text-center">
+              <LinkIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No links yet. Create your first shortened link above!</p>
             </div>
-          ))}
+          ) : (
+            links.map((link, index) => (
+              <div key={link.id} className="p-6 hover:bg-surface-secondary/50 transition-all duration-300 group interactive-card" style={{animationDelay: `${index * 0.1}s`}}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-3 h-3 rounded-full animate-pulse-custom ${
+                          link.status === 'active' ? 'bg-success' : 'bg-warning'
+                        }`}></div>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          link.status === 'active' 
+                            ? 'text-success bg-success/10' 
+                            : 'text-warning bg-warning/10'
+                        }`}>
+                          {link.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>{format(new Date(link.created_at), 'MMM d, yyyy')}</span>
+                      </div>
+                    </div>
+                    
+                    <a 
+                      href={link.short_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary-dark font-semibold text-lg truncate flex items-center space-x-2 group-hover:underline transition-all duration-300"
+                    >
+                      <span className="truncate">{link.short_url}</span>
+                      <ExternalLink className="w-4 h-4 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                    </a>
+                    
+                    <p className="text-sm text-muted-foreground truncate mt-1 group-hover:text-card-foreground transition-colors">
+                      {link.original_url}
+                    </p>
+                    
+                    <div className="flex items-center space-x-6 mt-3">
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        <span className="text-sm font-medium text-card-foreground">{link.total_clicks || 0}</span>
+                        <span className="text-xs text-muted-foreground">Total Clicks</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-success rounded-full"></div>
+                        <span className="text-sm font-medium text-card-foreground">{link.unique_clicks || 0}</span>
+                        <span className="text-xs text-muted-foreground">Unique</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(link.short_url, link.id)}
+                    className="flex items-center space-x-2 hover-lift hover:border-primary group-hover:shadow-md transition-all duration-300"
+                  >
+                    {copiedId === link.id ? (
+                      <>
+                        <Check className="w-4 h-4 text-success" />
+                        <span className="font-medium text-success">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span className="font-medium">Copy</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </Card>
     </div>

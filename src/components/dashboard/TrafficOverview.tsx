@@ -6,36 +6,20 @@ import { CalendarDays, TrendingUp, MousePointer, Users } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const TrafficOverview = () => {
   const [startDate, setStartDate] = useState<Date>(new Date(2025, 6, 15)); // July 15, 2025
   const [endDate, setEndDate] = useState<Date>(new Date(2025, 6, 29)); // July 29, 2025
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
+  const { analytics, loading } = useAnalytics(startDate, endDate);
+
   const formatDateRange = (start: Date, end: Date) => {
     return `${format(start, "MM/dd/yyyy")} - ${format(end, "MM/dd/yyyy")}`;
   };
 
-  // Sample chart data with more interesting values
-  const chartData = [
-    { date: "15 July", clicks: 17, percentage: 43 },
-    { date: "16 July", clicks: 39, percentage: 100 },
-    { date: "17 July", clicks: 30, percentage: 77 },
-    { date: "18 July", clicks: 25, percentage: 64 },
-    { date: "19 July", clicks: 23, percentage: 59 },
-    { date: "20 July", clicks: 20, percentage: 51 },
-    { date: "21 July", clicks: 21, percentage: 54 },
-    { date: "22 July", clicks: 22, percentage: 56 },
-    { date: "23 July", clicks: 20, percentage: 51 },
-    { date: "24 July", clicks: 28, percentage: 72 },
-    { date: "25 July", clicks: 28, percentage: 72 },
-    { date: "26 July", clicks: 36, percentage: 92 },
-    { date: "27 July", clicks: 12, percentage: 31 },
-    { date: "28 July", clicks: 32, percentage: 82 },
-    { date: "29 July", clicks: 8, percentage: 21 }
-  ];
-
-  const maxClicks = Math.max(...chartData.map(d => d.clicks));
+  const maxClicks = Math.max(...analytics.chartData.map(d => d.clicks), 1);
 
   return (
     <div className="space-y-6 animate-fade-in">
