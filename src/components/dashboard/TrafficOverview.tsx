@@ -87,7 +87,7 @@ const TrafficOverview = () => {
                 Total Clicks
               </p>
               <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-primary transition-colors">
-                1,192
+                {analytics.totalClicks}
               </p>
               <div className="flex items-center mt-2 text-sm">
                 <TrendingUp className="w-4 h-4 text-success mr-1" />
@@ -108,7 +108,7 @@ const TrafficOverview = () => {
                 Clicks (Current Period)
               </p>
               <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-success transition-colors">
-                361
+                {analytics.currentPeriodClicks}
               </p>
               <div className="flex items-center mt-2 text-sm">
                 <TrendingUp className="w-4 h-4 text-success mr-1" />
@@ -129,7 +129,7 @@ const TrafficOverview = () => {
                 Clicks (Today)
               </p>
               <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-warning transition-colors">
-                8
+                {analytics.todayClicks}
               </p>
               <div className="flex items-center mt-2 text-sm">
                 <div className="w-2 h-2 bg-success rounded-full animate-pulse-custom mr-2"></div>
@@ -161,7 +161,7 @@ const TrafficOverview = () => {
           
           <div className="relative bg-surface-secondary/30 rounded-lg p-4">
             <div className="flex items-end justify-between h-72 space-x-2">
-              {chartData.map((data, index) => {
+              {analytics.chartData.map((data, index) => {
                 const height = (data.clicks / maxClicks) * 100;
                 return (
                   <div key={index} className="flex-1 flex flex-col items-center group relative">
@@ -180,7 +180,7 @@ const TrafficOverview = () => {
                       </div>
                     </div>
                     <span className="text-xs text-muted-foreground mt-3 font-medium group-hover:text-card-foreground transition-colors">
-                      {data.date.split(' ')[0]}
+                      {format(new Date(data.date), 'MMM d')}
                     </span>
                   </div>
                 );
