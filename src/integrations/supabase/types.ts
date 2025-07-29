@@ -14,16 +14,192 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analytics_daily: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          link_id: string
+          total_clicks: number | null
+          unique_clicks: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          link_id: string
+          total_clicks?: number | null
+          unique_clicks?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          link_id?: string
+          total_clicks?: number | null
+          unique_clicks?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_daily_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clicks: {
+        Row: {
+          browser_type: Database["public"]["Enums"]["browser_type"] | null
+          browser_version: string | null
+          city: string | null
+          clicked_at: string | null
+          country: string | null
+          country_name: string | null
+          device_type: Database["public"]["Enums"]["device_type"] | null
+          fingerprint: string | null
+          id: string
+          ip_address: unknown | null
+          is_unique: boolean | null
+          language: string | null
+          latitude: number | null
+          link_id: string
+          longitude: number | null
+          os_type: Database["public"]["Enums"]["os_type"] | null
+          os_version: string | null
+          referer: string | null
+          region: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          browser_type?: Database["public"]["Enums"]["browser_type"] | null
+          browser_version?: string | null
+          city?: string | null
+          clicked_at?: string | null
+          country?: string | null
+          country_name?: string | null
+          device_type?: Database["public"]["Enums"]["device_type"] | null
+          fingerprint?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_unique?: boolean | null
+          language?: string | null
+          latitude?: number | null
+          link_id: string
+          longitude?: number | null
+          os_type?: Database["public"]["Enums"]["os_type"] | null
+          os_version?: string | null
+          referer?: string | null
+          region?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          browser_type?: Database["public"]["Enums"]["browser_type"] | null
+          browser_version?: string | null
+          city?: string | null
+          clicked_at?: string | null
+          country?: string | null
+          country_name?: string | null
+          device_type?: Database["public"]["Enums"]["device_type"] | null
+          fingerprint?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_unique?: boolean | null
+          language?: string | null
+          latitude?: number | null
+          link_id?: string
+          longitude?: number | null
+          os_type?: Database["public"]["Enums"]["os_type"] | null
+          os_version?: string | null
+          referer?: string | null
+          region?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clicks_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      links: {
+        Row: {
+          analytics_enabled: boolean | null
+          created_at: string | null
+          custom_domain: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          original_url: string
+          password_hash: string | null
+          short_code: string
+          short_url: string
+          status: Database["public"]["Enums"]["link_status"] | null
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          analytics_enabled?: boolean | null
+          created_at?: string | null
+          custom_domain?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          original_url: string
+          password_hash?: string | null
+          short_code: string
+          short_url: string
+          status?: Database["public"]["Enums"]["link_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          analytics_enabled?: boolean | null
+          created_at?: string | null
+          custom_domain?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          original_url?: string
+          password_hash?: string | null
+          short_code?: string
+          short_url?: string
+          status?: Database["public"]["Enums"]["link_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_short_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      browser_type:
+        | "chrome"
+        | "firefox"
+        | "safari"
+        | "edge"
+        | "opera"
+        | "whatsapp"
+        | "telegram"
+        | "other"
+      device_type: "desktop" | "mobile" | "tablet" | "unknown"
+      link_status: "active" | "inactive" | "expired"
+      os_type: "windows" | "macos" | "linux" | "android" | "ios" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +326,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      browser_type: [
+        "chrome",
+        "firefox",
+        "safari",
+        "edge",
+        "opera",
+        "whatsapp",
+        "telegram",
+        "other",
+      ],
+      device_type: ["desktop", "mobile", "tablet", "unknown"],
+      link_status: ["active", "inactive", "expired"],
+      os_type: ["windows", "macos", "linux", "android", "ios", "other"],
+    },
   },
 } as const
