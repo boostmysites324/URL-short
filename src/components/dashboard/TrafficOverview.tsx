@@ -6,106 +6,162 @@ import { useState } from "react";
 const TrafficOverview = () => {
   const [dateRange, setDateRange] = useState("07/15/2025 - 07/29/2025");
 
-  // Sample chart data
+  // Sample chart data with more interesting values
   const chartData = [
-    { date: "15 July", clicks: 17 },
-    { date: "16 July", clicks: 39 },
-    { date: "17 July", clicks: 30 },
-    { date: "18 July", clicks: 25 },
-    { date: "19 July", clicks: 23 },
-    { date: "20 July", clicks: 20 },
-    { date: "21 July", clicks: 21 },
-    { date: "22 July", clicks: 22 },
-    { date: "23 July", clicks: 20 },
-    { date: "24 July", clicks: 28 },
-    { date: "25 July", clicks: 28 },
-    { date: "26 July", clicks: 36 },
-    { date: "27 July", clicks: 12 },
-    { date: "28 July", clicks: 32 },
-    { date: "29 July", clicks: 8 }
+    { date: "15 July", clicks: 17, percentage: 43 },
+    { date: "16 July", clicks: 39, percentage: 100 },
+    { date: "17 July", clicks: 30, percentage: 77 },
+    { date: "18 July", clicks: 25, percentage: 64 },
+    { date: "19 July", clicks: 23, percentage: 59 },
+    { date: "20 July", clicks: 20, percentage: 51 },
+    { date: "21 July", clicks: 21, percentage: 54 },
+    { date: "22 July", clicks: 22, percentage: 56 },
+    { date: "23 July", clicks: 20, percentage: 51 },
+    { date: "24 July", clicks: 28, percentage: 72 },
+    { date: "25 July", clicks: 28, percentage: 72 },
+    { date: "26 July", clicks: 36, percentage: 92 },
+    { date: "27 July", clicks: 12, percentage: 31 },
+    { date: "28 July", clicks: 32, percentage: 82 },
+    { date: "29 July", clicks: 8, percentage: 21 }
   ];
 
   const maxClicks = Math.max(...chartData.map(d => d.clicks));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl font-semibold text-card-foreground">Traffic Overview</h2>
+        <div>
+          <h2 className="text-3xl font-bold text-card-foreground bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+            Traffic Overview
+          </h2>
+          <p className="text-muted-foreground mt-1">Monitor your link performance in real-time</p>
+        </div>
         <Button 
           variant="outline" 
-          className="flex items-center space-x-2 w-fit"
+          className="flex items-center space-x-2 w-fit hover-lift hover:border-primary transition-all duration-300 group"
           onClick={() => setDateRange("07/15/2025 - 07/29/2025")}
         >
-          <CalendarDays className="w-4 h-4" />
-          <span className="text-sm">{dateRange}</span>
+          <CalendarDays className="w-4 h-4 group-hover:text-primary transition-colors" />
+          <span className="text-sm font-medium">{dateRange}</span>
         </Button>
       </div>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 card-gradient shadow-card border-card-border">
+        <Card className="p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Clicks</p>
-              <p className="text-3xl font-bold text-card-foreground mt-1">1,192</p>
+              <p className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                Total Clicks
+              </p>
+              <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-primary transition-colors">
+                1,192
+              </p>
+              <div className="flex items-center mt-2 text-sm">
+                <TrendingUp className="w-4 h-4 text-success mr-1" />
+                <span className="text-success font-medium">+12.5%</span>
+                <span className="text-muted-foreground ml-1">from last month</span>
+              </div>
             </div>
-            <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded-lg">
-              <MousePointer className="w-6 h-6 text-primary" />
+            <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-300">
+              <MousePointer className="w-8 h-8 text-primary group-hover:scale-110 transition-transform" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 card-gradient shadow-card border-card-border">
+        <Card className="p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up" style={{animationDelay: '0.1s'}}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Clicks (Current Period)</p>
-              <p className="text-3xl font-bold text-card-foreground mt-1">361</p>
+              <p className="text-sm font-medium text-muted-foreground group-hover:text-success transition-colors">
+                Clicks (Current Period)
+              </p>
+              <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-success transition-colors">
+                361
+              </p>
+              <div className="flex items-center mt-2 text-sm">
+                <TrendingUp className="w-4 h-4 text-success mr-1" />
+                <span className="text-success font-medium">+8.2%</span>
+                <span className="text-muted-foreground ml-1">vs last period</span>
+              </div>
             </div>
-            <div className="flex items-center justify-center w-12 h-12 bg-success/10 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-success" />
+            <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-success/20 to-success/10 rounded-2xl group-hover:from-success/30 group-hover:to-success/20 transition-all duration-300">
+              <TrendingUp className="w-8 h-8 text-success group-hover:scale-110 transition-transform" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 card-gradient shadow-card border-card-border">
+        <Card className="p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up" style={{animationDelay: '0.2s'}}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Clicks (Today)</p>
-              <p className="text-3xl font-bold text-card-foreground mt-1">8</p>
+              <p className="text-sm font-medium text-muted-foreground group-hover:text-warning transition-colors">
+                Clicks (Today)
+              </p>
+              <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-warning transition-colors">
+                8
+              </p>
+              <div className="flex items-center mt-2 text-sm">
+                <div className="w-2 h-2 bg-success rounded-full animate-pulse-custom mr-2"></div>
+                <span className="text-muted-foreground">Live tracking</span>
+              </div>
             </div>
-            <div className="flex items-center justify-center w-12 h-12 bg-warning/10 rounded-lg">
-              <Users className="w-6 h-6 text-warning" />
+            <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-warning/20 to-warning/10 rounded-2xl group-hover:from-warning/30 group-hover:to-warning/20 transition-all duration-300">
+              <Users className="w-8 h-8 text-warning group-hover:scale-110 transition-transform" />
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Chart */}
-      <Card className="p-6 card-gradient shadow-card border-card-border">
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-card-foreground">Daily Click Activity</h3>
+      {/* Enhanced Chart */}
+      <Card className="p-6 card-gradient shadow-card border-card-border hover-glow animate-slide-up" style={{animationDelay: '0.3s'}}>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-card-foreground">Daily Click Activity</h3>
+              <p className="text-sm text-muted-foreground mt-1">Interactive chart showing daily performance</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-primary rounded-full"></div>
+                <span className="text-sm text-muted-foreground">Clicks</span>
+              </div>
+            </div>
+          </div>
           
-          <div className="relative">
-            <div className="flex items-end justify-between h-64 space-x-1">
+          <div className="relative bg-surface-secondary/30 rounded-lg p-4">
+            <div className="flex items-end justify-between h-72 space-x-2">
               {chartData.map((data, index) => {
                 const height = (data.clicks / maxClicks) * 100;
                 return (
-                  <div key={index} className="flex-1 flex flex-col items-center group">
+                  <div key={index} className="flex-1 flex flex-col items-center group relative">
                     <div 
-                      className="w-full bg-primary hover:bg-primary-dark transition-colors rounded-t-sm relative cursor-pointer"
-                      style={{ height: `${height}%` }}
+                      className="w-full bg-gradient-to-t from-primary to-primary-light hover:from-primary-dark hover:to-primary rounded-t-lg relative cursor-pointer chart-bar shadow-md"
+                      style={{ 
+                        height: `${height}%`,
+                        minHeight: '8px'
+                      }}
                     >
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        {data.date}: {data.clicks} clicks
+                      {/* Enhanced Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-card border border-card-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-20 animate-scale-in">
+                        <div className="text-sm font-semibold text-card-foreground">{data.date}</div>
+                        <div className="text-sm text-primary font-medium">{data.clicks} clicks</div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-card border-r border-b border-card-border rotate-45"></div>
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground mt-2 transform rotate-45 origin-left">
+                    <span className="text-xs text-muted-foreground mt-3 font-medium group-hover:text-card-foreground transition-colors">
                       {data.date.split(' ')[0]}
                     </span>
                   </div>
                 );
               })}
+            </div>
+            
+            {/* Y-axis labels */}
+            <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-muted-foreground py-4">
+              <span>{maxClicks}</span>
+              <span>{Math.round(maxClicks * 0.75)}</span>
+              <span>{Math.round(maxClicks * 0.5)}</span>
+              <span>{Math.round(maxClicks * 0.25)}</span>
+              <span>0</span>
             </div>
           </div>
         </div>

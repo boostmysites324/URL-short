@@ -23,54 +23,58 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="w-full border-b border-card-border bg-card shadow-card">
+    <nav className="w-full border-b border-card-border bg-card shadow-card backdrop-blur-sm bg-opacity-95 sticky top-0 z-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
+          <div className="flex items-center space-x-2 animate-fade-in">
+            <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-xl shadow-lg hover:shadow-glow transition-all duration-300 hover:scale-105">
               <Link className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-semibold text-card-foreground">ShortLink</span>
+            <span className="text-xl font-bold text-card-foreground bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+              ShortLink
+            </span>
           </div>
 
           {/* Center - Quick Shortener */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex items-center animate-scale-in">
             <Button 
               variant="ghost" 
-              className="flex items-center space-x-2 text-muted-foreground hover:text-card-foreground transition-colors"
+              className="flex items-center space-x-2 text-muted-foreground hover:text-card-foreground hover:bg-surface-secondary/80 transition-all duration-300 rounded-lg px-4 py-2 group"
             >
-              <Command className="w-4 h-4" />
-              <span>Quick Shortener</span>
-              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <Command className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="font-medium">Quick Shortener</span>
+              <kbd className="pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded-md border border-border bg-muted px-2 font-mono text-[11px] font-medium text-muted-foreground shadow-sm">
                 CTRL + K
               </kbd>
             </Button>
           </div>
 
           {/* Right - Theme Toggle & User */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 animate-fade-in">
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleTheme}
-              className="w-9 h-9 p-0"
+              className="w-10 h-10 p-0 hover:bg-surface-secondary/80 hover:scale-110 transition-all duration-300 rounded-lg"
             >
               {isDark ? (
-                <Sun className="w-4 h-4" />
+                <Sun className="w-4 h-4 text-amber-500" />
               ) : (
-                <Moon className="w-4 h-4" />
+                <Moon className="w-4 h-4 text-slate-600" />
               )}
               <span className="sr-only">Toggle theme</span>
             </Button>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 hover:bg-surface-secondary/50 rounded-lg p-2 transition-all duration-300 cursor-pointer group">
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium text-card-foreground">Gopalkrishna94173</p>
+                <p className="text-sm font-semibold text-card-foreground group-hover:text-primary transition-colors">
+                  Gopalkrishna94173
+                </p>
                 <p className="text-xs text-muted-foreground">Admin</p>
               </div>
-              <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-full">
-                <User className="w-4 h-4 text-primary-foreground" />
+              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full shadow-md group-hover:shadow-glow group-hover:scale-105 transition-all duration-300">
+                <User className="w-5 h-5 text-primary-foreground" />
               </div>
             </div>
           </div>
