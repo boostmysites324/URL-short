@@ -19,7 +19,7 @@ const TrafficOverview = () => {
     return `${format(start, "MM/dd/yyyy")} - ${format(end, "MM/dd/yyyy")}`;
   };
 
-  const maxClicks = Math.max(...analytics.chartData.map(d => d.clicks), 1);
+  const maxClicks = Math.max(...(analytics.chartData || []).map(d => d.clicks), 1);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -161,7 +161,7 @@ const TrafficOverview = () => {
           
           <div className="relative bg-surface-secondary/30 rounded-lg p-4">
             <div className="flex items-end justify-between h-72 space-x-2">
-              {analytics.chartData.map((data, index) => {
+              {(analytics.chartData || []).map((data, index) => {
                 const height = (data.clicks / maxClicks) * 100;
                 return (
                   <div key={index} className="flex-1 flex flex-col items-center group relative">
