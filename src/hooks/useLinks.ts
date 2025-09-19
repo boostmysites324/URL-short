@@ -28,11 +28,22 @@ export const useLinks = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const fetchLinks = async () => {
+  const fetchLinks = async (showLogs = false) => {
     try {
       setLoading(true);
       
-      // Get links with click counts
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLinks([]);
+        return;
+      }
+      
+      if (showLogs) {
+        console.log('Fetching links for user:', user.id);
+      }
+      
+      // Get links with click counts for current user only
       const { data: linksData, error: linksError } = await supabase
         .from('links')
         .select(`
@@ -42,14 +53,22 @@ export const useLinks = () => {
             unique_clicks
           )
         `)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (linksError) throw linksError;
+      if (linksError) {
+        console.error('Error fetching links:', linksError);
+        throw linksError;
+      }
 
       // Process links to include total click counts
       const processedLinks = linksData?.map(link => {
         const totalClicks = link.analytics_daily?.reduce((sum: number, day: any) => sum + (day.total_clicks || 0), 0) || 0;
         const uniqueClicks = link.analytics_daily?.reduce((sum: number, day: any) => sum + (day.unique_clicks || 0), 0) || 0;
+        
+        if (showLogs) {
+          console.log(`Link ${link.short_code}: total=${totalClicks}, unique=${uniqueClicks}`);
+        }
         
         return {
           ...link,
@@ -58,6 +77,9 @@ export const useLinks = () => {
         };
       }) || [];
 
+      if (showLogs) {
+        console.log('Processed links:', processedLinks);
+      }
       setLinks(processedLinks);
     } catch (error) {
       console.error('Error fetching links:', error);
@@ -140,29 +162,32 @@ export const useLinks = () => {
   };
 
   useEffect(() => {
-    fetchLinks();
+    // Initial fetch with logs
+    fetchLinks(true);
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates for individual link updates - only analytics_daily
     const subscription = supabase
-      .channel('links-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'links'
-      }, () => {
-        fetchLinks();
-      })
+      .channel('links-fast-updates')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'analytics_daily'
-      }, () => {
-        fetchLinks();
+      }, (payload) => {
+        console.log('📊 Analytics updated! Refreshing link counts...');
+        fetchLinks(false);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Links subscription status:', status);
+      });
+
+    // More frequent refresh for faster individual link updates
+    const refreshInterval = setInterval(() => {
+      fetchLinks(false); // Silent refresh
+    }, 10000); // Refresh every 10 seconds for faster individual updates
 
     return () => {
       supabase.removeChannel(subscription);
+      clearInterval(refreshInterval);
     };
   }, []);
 

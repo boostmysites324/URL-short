@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Connection Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Supabase Connection Test</h1>
+    <div id="result"></div>
+    
+    <script>
+        const SUPABASE_URL = "https://ozkuefljvpzpmbrkknfw.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96a3VlZmxqdnB6cG1icmtrbmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3NzE2NzIsImV4cCI6MjA2OTM0NzY3Mn0.2SXI4yjzIQ0P8GE_bZtHIbrvkfmcHAAqDU81_gW9Wqo";
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing connection...';
+            
+            try {
+                // Test basic connection
+                const { data, error } = await supabase.from('links').select('count').limit(1);
+                resultDiv.innerHTML = `Connection test: ${error ? 'FAILED - ' + error.message : 'SUCCESS'}`;
+                
+                // Test auth
+                const { data: authData, error: authError } = await supabase.auth.getSession();
+                resultDiv.innerHTML += `<br>Auth test: ${authError ? 'FAILED - ' + authError.message : 'SUCCESS'}`;
+                
+            } catch (err) {
+                resultDiv.innerHTML = `Connection failed: ${err.message}`;
+            }
+        }
+        
+        testConnection();
+    </script>
+</body>
+</html>

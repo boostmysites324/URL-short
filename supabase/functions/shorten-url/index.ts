@@ -21,7 +21,19 @@ serve(async (req) => {
 
     const requestBody = await req.json();
     console.log('Request body:', requestBody);
-    const { url, customDomain, expiresAt, password, analyticsEnabled } = requestBody;
+    const { 
+      url, 
+      customDomain, 
+      expiresAt, 
+      password, 
+      analyticsEnabled,
+      customAlias,
+      description,
+      channelId,
+      campaignId,
+      pixelIds,
+      redirectType
+    } = requestBody;
 
     if (!url) {
       return new Response(
@@ -50,26 +62,44 @@ serve(async (req) => {
       userId = user?.id;
     }
 
-    // Generate unique short code
+    // Generate unique short code or use custom alias
     let shortCode = '';
     let isUnique = false;
     let attempts = 0;
     const maxAttempts = 10;
 
-    while (!isUnique && attempts < maxAttempts) {
-      const { data: generatedCode } = await supabaseClient.rpc('generate_short_code');
-      shortCode = generatedCode;
-      
+    if (customAlias) {
+      // Check if custom alias is available
       const { data: existingLink } = await supabaseClient
         .from('links')
         .select('id')
-        .eq('short_code', shortCode)
+        .eq('short_code', customAlias)
         .single();
       
-      if (!existingLink) {
-        isUnique = true;
+      if (existingLink) {
+        return new Response(
+          JSON.stringify({ error: 'Custom alias already exists' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-      attempts++;
+      shortCode = customAlias;
+      isUnique = true;
+    } else {
+      while (!isUnique && attempts < maxAttempts) {
+        const { data: generatedCode } = await supabaseClient.rpc('generate_short_code');
+        shortCode = generatedCode;
+        
+        const { data: existingLink } = await supabaseClient
+          .from('links')
+          .select('id')
+          .eq('short_code', shortCode)
+          .single();
+        
+        if (!existingLink) {
+          isUnique = true;
+        }
+        attempts++;
+      }
     }
 
     if (!isUnique) {
@@ -79,8 +109,11 @@ serve(async (req) => {
       );
     }
 
-    // Create short URL
-    const domain = customDomain || 'https://ozkuefljvpzpmbrkknfw.supabase.co';
+    // Generate a simple short URL that will work locally
+    // For development, use localhost with a simple redirect setup
+    let domain = 'http://localhost:8081';
+    
+    console.log('Using localhost domain:', domain);
     const shortUrl = `${domain}/s/${shortCode}`;
 
     // Hash password if provided
@@ -104,7 +137,13 @@ serve(async (req) => {
         custom_domain: customDomain,
         expires_at: expiresAt,
         password_hash: passwordHash,
-        analytics_enabled: analyticsEnabled ?? true
+        analytics_enabled: analyticsEnabled ?? true,
+        title: description,
+        description: description,
+        channel_id: channelId,
+        campaign_id: campaignId,
+        custom_alias: customAlias,
+        redirect_type: redirectType || 'direct'
       })
       .select()
       .single();
@@ -115,6 +154,23 @@ serve(async (req) => {
         JSON.stringify({ error: 'Failed to create short link' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Add pixels to link if provided
+    if (pixelIds && pixelIds.length > 0) {
+      const pixelInserts = pixelIds.map(pixelId => ({
+        link_id: link.id,
+        pixel_id: pixelId
+      }));
+
+      const { error: pixelError } = await supabaseClient
+        .from('link_pixels')
+        .insert(pixelInserts);
+
+      if (pixelError) {
+        console.error('Error adding pixels:', pixelError);
+        // Don't fail the entire operation for pixel errors
+      }
     }
 
     return new Response(

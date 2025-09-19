@@ -1,9 +1,13 @@
 import { Link, Command, User, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import QuickShortenerModal from "@/components/shortener/QuickShortenerModal";
 
 const Navbar = () => {
   const [isDark, setIsDark] = useState(false);
+  const [isQuickShortenerOpen, setIsQuickShortenerOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     // Check for saved theme preference or default to light
@@ -21,6 +25,19 @@ const Navbar = () => {
     localStorage.setItem('theme', newTheme ? 'dark' : 'light');
     document.documentElement.classList.toggle('dark', newTheme);
   };
+
+  // Handle keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        setIsQuickShortenerOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <nav className="w-full border-b border-card-border bg-card shadow-card backdrop-blur-sm bg-opacity-95 sticky top-0 z-50">
@@ -40,6 +57,7 @@ const Navbar = () => {
           <div className="hidden md:flex items-center animate-scale-in">
             <Button 
               variant="ghost" 
+              onClick={() => setIsQuickShortenerOpen(true)}
               className="flex items-center space-x-2 text-muted-foreground hover:text-card-foreground hover:bg-surface-secondary/80 transition-all duration-300 rounded-lg px-4 py-2 group"
             >
               <Command className="w-4 h-4 group-hover:scale-110 transition-transform" />
@@ -66,20 +84,42 @@ const Navbar = () => {
               <span className="sr-only">Toggle theme</span>
             </Button>
             
-            <div className="flex items-center space-x-3 hover:bg-surface-secondary/50 rounded-lg p-2 transition-all duration-300 cursor-pointer group">
-              <div className="hidden sm:block text-right">
-                <p className="text-sm font-semibold text-card-foreground group-hover:text-primary transition-colors">
-                  Gopalkrishna94173
-                </p>
-                <p className="text-xs text-muted-foreground">Admin</p>
+            {user ? (
+              <div className="flex items-center space-x-3 hover:bg-surface-secondary/50 rounded-lg p-2 transition-all duration-300 cursor-pointer group">
+                <div className="hidden sm:block text-right">
+                  <p className="text-sm font-semibold text-card-foreground group-hover:text-primary transition-colors">
+                    {user.user_metadata?.full_name || user.email}
+                  </p>
+                  <p className="text-xs text-muted-foreground">User</p>
+                </div>
+                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full shadow-md group-hover:shadow-glow group-hover:scale-105 transition-all duration-300">
+                  <User className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={signOut}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  Sign Out
+                </Button>
               </div>
-              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full shadow-md group-hover:shadow-glow group-hover:scale-105 transition-all duration-300">
-                <User className="w-5 h-5 text-primary-foreground" />
-              </div>
-            </div>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/auth'}
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </div>
+      
+      <QuickShortenerModal 
+        isOpen={isQuickShortenerOpen}
+        onClose={() => setIsQuickShortenerOpen(false)}
+      />
     </nav>
   );
 };

@@ -1,193 +1,203 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { MoreHorizontal, ExternalLink, Globe, Monitor, Smartphone, Activity, MapPin } from "lucide-react";
-import { useAnalytics } from "@/hooks/useAnalytics";
-import { format } from "date-fns";
+import { useState, useEffect } from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Clock, MapPin, Smartphone, Monitor, Globe, TrendingUp } from 'lucide-react';
+import { format } from 'date-fns';
 
-const RecentActivity = () => {
-  const { recentActivity, loading } = useAnalytics();
+interface ActivityItem {
+  id: string;
+  link_id: string;
+  ip_address: string;
+  user_agent: string;
+  country: string;
+  city: string;
+  device_type: string;
+  browser: string;
+  os: string;
+  referrer: string;
+  created_at: string;
+}
 
-  const getDeviceIcon = (device: string) => {
-    switch (device.toLowerCase()) {
-      case 'android':
-        return <Smartphone className="w-3 h-3 text-success" />;
-      case 'linux':
-        return <Monitor className="w-3 h-3 text-primary" />;
-      case 'desktop':
-        return <Monitor className="w-3 h-3 text-primary" />;
-      case 'mobile':
-        return <Smartphone className="w-3 h-3 text-success" />;
-      case 'tablet':
-        return <Smartphone className="w-3 h-3 text-warning" />;
-      default:
-        return <Monitor className="w-3 h-3 text-muted-foreground" />;
+interface RecentActivityProps {
+  linkId: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const RecentActivity = ({ linkId, isOpen, onClose }: RecentActivityProps) => {
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && linkId) {
+      fetchRecentActivity();
+    }
+  }, [isOpen, linkId]);
+
+  const fetchRecentActivity = async () => {
+    setLoading(true);
+    try {
+      // This would be replaced with actual API call
+      // For now, we'll use mock data
+      const mockActivities: ActivityItem[] = [
+        {
+          id: '1',
+          link_id: linkId,
+          ip_address: '192.168.1.1',
+          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          country: 'India',
+          city: 'Mumbai',
+          device_type: 'Desktop',
+          browser: 'Chrome',
+          os: 'Windows',
+          referrer: 'https://google.com',
+          created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        },
+        {
+          id: '2',
+          link_id: linkId,
+          ip_address: '192.168.1.2',
+          user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)',
+          country: 'India',
+          city: 'Delhi',
+          device_type: 'Mobile',
+          browser: 'Safari',
+          os: 'iOS',
+          referrer: 'https://facebook.com',
+          created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+        },
+        {
+          id: '3',
+          link_id: linkId,
+          ip_address: '192.168.1.3',
+          user_agent: 'Mozilla/5.0 (Android 11; Mobile; rv:68.0)',
+          country: 'India',
+          city: 'Bangalore',
+          device_type: 'Mobile',
+          browser: 'Firefox',
+          os: 'Android',
+          referrer: 'https://twitter.com',
+          created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+        }
+      ];
+      
+      setActivities(mockActivities);
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getBrowserIcon = (browser: string) => {
-    const browserColors = {
-      chrome: 'bg-green-500',
-      firefox: 'bg-orange-500',
-      safari: 'bg-blue-500',
-      edge: 'bg-blue-600',
-      opera: 'bg-red-500',
-      whatsapp: 'bg-green-600',
-      telegram: 'bg-blue-400',
-      other: 'bg-gray-500'
-    };
-    
-    const color = browserColors[browser.toLowerCase() as keyof typeof browserColors] || browserColors.other;
-    
-    return (
-      <div className={`w-3 h-3 rounded-full ${color} flex items-center justify-center shadow-sm`}>
-        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-      </div>
-    );
+  const getDeviceIcon = (deviceType: string) => {
+    switch (deviceType.toLowerCase()) {
+      case 'mobile':
+        return <Smartphone className="w-4 h-4" />;
+      case 'desktop':
+        return <Monitor className="w-4 h-4" />;
+      default:
+        return <Globe className="w-4 h-4" />;
+    }
   };
 
-  const getCountryFlag = (countryCode: string) => {
-    const flags: { [key: string]: string } = {
-      'US': '🇺🇸',
-      'IN': '🇮🇳',
-      'GB': '🇬🇧',
-      'CA': '🇨🇦',
-      'AU': '🇦🇺',
-      'DE': '🇩🇪',
-      'FR': '🇫🇷',
-      'BR': '🇧🇷',
-      'JP': '🇯🇵',
-      'CN': '🇨🇳'
-    };
-    return flags[countryCode] || '🌍';
+  const getBrowserColor = (browser: string) => {
+    switch (browser.toLowerCase()) {
+      case 'chrome':
+        return 'bg-blue-100 text-blue-800';
+      case 'firefox':
+        return 'bg-orange-100 text-orange-800';
+      case 'safari':
+        return 'bg-gray-100 text-gray-800';
+      case 'edge':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const formatTimeAgo = (timestamp: string) => {
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
-    const clickTime = new Date(timestamp);
-    const diffInMinutes = Math.floor((now.getTime() - clickTime.getTime()) / (1000 * 60));
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
-    return format(clickTime, 'MMM d, yyyy');
+    return `${Math.floor(diffInMinutes / 1440)} days ago`;
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Card className="card-gradient shadow-card border-card-border hover-glow animate-slide-up">
-      <div className="p-6 border-b border-card-border bg-gradient-to-r from-transparent to-primary/5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg">
-              <Activity className="w-5 h-5 text-primary" />
-            </div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-4xl max-h-[80vh] overflow-hidden bg-card border-card-border">
+        <div className="p-6 border-b border-card-border">
+          <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xl font-bold text-card-foreground">Recent Activity</h3>
-              <p className="text-sm text-muted-foreground">Live link interaction tracking</p>
+              <p className="text-sm text-muted-foreground mt-1">Track clicks and user interactions</p>
             </div>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              ×
+            </Button>
           </div>
-          <Button variant="ghost" size="sm" className="hover-lift">
-            <MoreHorizontal className="w-4 h-4" />
-          </Button>
         </div>
-      </div>
 
-      <div className="divide-y divide-card-border max-h-[700px] overflow-y-auto">
-        {recentActivity.length === 0 ? (
-          <div className="p-8 text-center">
-            <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No recent activity yet. Short some links to see activity here!</p>
-          </div>
-        ) : (
-          recentActivity.map((activity, index) => (
-            <div 
-              key={activity.id} 
-              className="p-5 hover:bg-surface-secondary/50 transition-all duration-300 group interactive-card animate-fade-in"
-              style={{animationDelay: `${index * 0.1}s`}}
-            >
-              <div className="space-y-4">
-                {/* Enhanced URL and Link Section */}
-                <div className="space-y-2">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex items-center space-x-2 mt-1">
-                      <div className="w-3 h-3 bg-success rounded-full animate-pulse-custom shadow-sm"></div>
-                      <span className="text-xs font-medium text-success bg-success/10 px-2 py-1 rounded-full">
-                        Live
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <a 
-                        href={activity.original_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-primary hover:text-primary-dark font-semibold text-sm truncate flex items-center space-x-2 group-hover:underline transition-all duration-300"
-                      >
-                        <span className="truncate">{activity.original_url}</span>
-                        <ExternalLink className="w-4 h-4 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                      </a>
-                      <p className="text-xs text-muted-foreground truncate mt-1 group-hover:text-card-foreground transition-colors">
-                        {activity.short_url}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Enhanced Location and Device Info */}
-                <div className="flex flex-wrap items-center gap-4 text-xs">
-                  <div className="flex items-center space-x-2 bg-surface-secondary/50 rounded-lg px-3 py-1.5">
-                    <MapPin className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-lg">{getCountryFlag(activity.country)}</span>
-                    <span className="text-muted-foreground font-medium">{activity.city}, {activity.country_name}</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 bg-surface-secondary/50 rounded-lg px-3 py-1.5">
-                    {getDeviceIcon(activity.device_type)}
-                    <span className="text-muted-foreground font-medium capitalize">{activity.device_type}</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 bg-surface-secondary/50 rounded-lg px-3 py-1.5">
-                    {getBrowserIcon(activity.browser_type)}
-                    <span className="text-muted-foreground font-medium capitalize">{activity.browser_type}</span>
-                  </div>
-
-                  <div className="flex items-center space-x-2 bg-surface-secondary/50 rounded-lg px-3 py-1.5">
-                    <Monitor className="w-3 h-3 text-blue-500" />
-                    <span className="text-muted-foreground font-medium capitalize">{activity.os_type}</span>
-                  </div>
-                </div>
-
-                {/* Enhanced Stats with Better Visual Hierarchy */}
-                <div className="flex flex-wrap items-center gap-3 text-sm">
-                  <div className="flex items-center space-x-2 bg-red-500/10 rounded-lg px-3 py-1.5">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-red-600 font-bold">{activity.yesterdayClicks}</span>
-                    <span className="text-red-600/70 text-xs">Yesterday</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 bg-success/10 rounded-lg px-3 py-1.5">
-                    <div className="w-2 h-2 bg-success rounded-full"></div>
-                    <span className="text-success font-bold">{activity.todayClicks}</span>
-                    <span className="text-success/70 text-xs">Today</span>
-                  </div>
-                </div>
-
-                {/* Enhanced Time with Better Styling */}
-                <div className="flex items-center justify-between pt-2 border-t border-card-border/50">
-                  <p className="text-xs text-muted-foreground flex items-center space-x-1">
-                    <Activity className="w-3 h-3" />
-                    <span>{formatTimeAgo(activity.clicked_at)}</span>
-                  </p>
-                  <div className="flex items-center space-x-1">
-                    <div className="w-1 h-1 bg-primary rounded-full"></div>
-                    <div className="w-1 h-1 bg-primary/60 rounded-full"></div>
-                    <div className="w-1 h-1 bg-primary/30 rounded-full"></div>
-                  </div>
-                </div>
-              </div>
+        <div className="p-6 overflow-y-auto max-h-[60vh]">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ))
-        )}
-      </div>
-    </Card>
+          ) : activities.length === 0 ? (
+            <div className="text-center py-8">
+              <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No recent activity yet</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {activities.map((activity) => (
+                <div key={activity.id} className="bg-surface-secondary rounded-lg p-4 hover:bg-surface-secondary/80 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-lg">
+                        {getDeviceIcon(activity.device_type)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="font-medium text-card-foreground">{activity.city}, {activity.country}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {activity.device_type}
+                          </Badge>
+                          <Badge className={`text-xs ${getBrowserColor(activity.browser)}`}>
+                            {activity.browser}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <MapPin className="w-3 h-3" />
+                            <span>{activity.city}, {activity.country}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatTimeAgo(activity.created_at)}</span>
+                          </div>
+                        </div>
+                        {activity.referrer && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            Referrer: {activity.referrer}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
   );
 };
 

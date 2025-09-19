@@ -41,7 +41,7 @@ serve(async (req) => {
     // Get the link details for redirect
     const { data: link, error } = await supabaseClient
       .from('links')
-      .select('original_url, status, expires_at')
+      .select('original_url, status, expires_at, password_hash, redirect_type')
       .eq('short_code', shortCode)
       .single();
 
@@ -57,7 +57,50 @@ serve(async (req) => {
       return new Response('Link has expired', { status: 410 });
     }
 
-    // Redirect to original URL
+    // Check for password protection
+    if (link.password_hash) {
+      // Return a special response that the frontend can handle
+      return new Response(
+        JSON.stringify({ 
+          passwordRequired: true,
+          redirectType: link.redirect_type || 'direct'
+        }),
+        { 
+          status: 401, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
+    // Handle different redirect types
+    if (link.redirect_type === 'masked') {
+      // For masked redirects, we could return a page that loads the target in an iframe
+      // For now, we'll just redirect normally
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': link.original_url,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          ...corsHeaders
+        }
+      });
+    } else if (link.redirect_type === 'splash') {
+      // For splash page redirects, we could return a custom splash page
+      // For now, we'll just redirect normally
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': link.original_url,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          ...corsHeaders
+        }
+      });
+    }
+
+    // Default direct redirect
     return new Response(null, {
       status: 302,
       headers: {

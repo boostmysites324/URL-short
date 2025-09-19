@@ -42,6 +42,18 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
     try {
       setLoading(true);
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setAnalytics({
+          totalClicks: 0,
+          currentPeriodClicks: 0,
+          todayClicks: 0,
+          chartData: []
+        });
+        return;
+      }
+
       const today = new Date().toISOString().split('T')[0];
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
@@ -50,20 +62,34 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
                          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const periodEnd = endDate ? endDate.toISOString().split('T')[0] : today;
 
-      // Get total clicks (all time)
+      console.log('Fetching analytics for user:', user.id);
+
+      // Get total clicks (all time) for user's links
       const { data: totalClicksData, error: totalError } = await supabase
         .from('analytics_daily')
-        .select('total_clicks')
+        .select(`
+          total_clicks,
+          links!inner(
+            user_id
+          )
+        `)
+        .eq('links.user_id', user.id)
         .gte('date', '2020-01-01');
 
       if (totalError) throw totalError;
 
       const totalClicks = totalClicksData?.reduce((sum, day) => sum + (day.total_clicks || 0), 0) || 0;
 
-      // Get current period clicks
+      // Get current period clicks for user's links
       const { data: periodClicksData, error: periodError } = await supabase
         .from('analytics_daily')
-        .select('total_clicks')
+        .select(`
+          total_clicks,
+          links!inner(
+            user_id
+          )
+        `)
+        .eq('links.user_id', user.id)
         .gte('date', periodStart)
         .lte('date', periodEnd);
 
@@ -71,31 +97,59 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
 
       const currentPeriodClicks = periodClicksData?.reduce((sum, day) => sum + (day.total_clicks || 0), 0) || 0;
 
-      // Get today's clicks
+      // Get today's clicks for user's links
       const { data: todayClicksData, error: todayError } = await supabase
         .from('analytics_daily')
-        .select('total_clicks')
+        .select(`
+          total_clicks,
+          links!inner(
+            user_id
+          )
+        `)
+        .eq('links.user_id', user.id)
         .eq('date', today);
 
       if (todayError) throw todayError;
 
       const todayClicks = todayClicksData?.reduce((sum, day) => sum + (day.total_clicks || 0), 0) || 0;
 
-      // Get chart data for the selected period
+      // Get chart data for the selected period for user's links with URL breakdown
       const { data: chartData, error: chartError } = await supabase
         .from('analytics_daily')
-        .select('date, total_clicks')
+        .select(`
+          date, 
+          total_clicks,
+          links!inner(
+            user_id,
+            short_code,
+            original_url
+          )
+        `)
+        .eq('links.user_id', user.id)
         .gte('date', periodStart)
         .lte('date', periodEnd)
         .order('date', { ascending: true });
 
       if (chartError) throw chartError;
 
-      // Process chart data
+      // Process chart data with URL breakdown
       const processedChartData = chartData?.map(day => ({
         date: day.date,
-        clicks: day.total_clicks || 0
+        clicks: day.total_clicks || 0,
+        urlBreakdown: {
+          shortCode: day.links?.short_code,
+          originalUrl: day.links?.original_url,
+          clicks: day.total_clicks || 0
+        }
       })) || [];
+
+      console.log('📊 Analytics Chart Data:', {
+        rawData: chartData,
+        processedData: processedChartData,
+        totalClicks,
+        currentPeriodClicks,
+        todayClicks
+      });
 
       setAnalytics({
         totalClicks,
@@ -188,27 +242,28 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
     fetchAnalytics();
     fetchRecentActivity();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates - only listen to analytics_daily changes
     const subscription = supabase
       .channel('analytics-changes')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'clicks'
-      }, () => {
-        fetchRecentActivity();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
         table: 'analytics_daily'
-      }, () => {
+      }, (payload) => {
+        console.log('Real-time analytics update:', payload);
         fetchAnalytics();
       })
       .subscribe();
 
+    // Also set up a periodic refresh as a fallback (reduced frequency)
+    const refreshInterval = setInterval(() => {
+      fetchAnalytics();
+      fetchRecentActivity();
+    }, 120000); // Refresh every 2 minutes (silent)
+
     return () => {
       supabase.removeChannel(subscription);
+      clearInterval(refreshInterval);
     };
   }, [startDate, endDate]);
 

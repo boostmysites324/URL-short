@@ -1,210 +1,320 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Track-click function for URL redirection and analytics
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, user-agent, referer, accept-language',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
-// Helper function to detect device type
-function detectDevice(userAgent: string): string {
-  const ua = userAgent.toLowerCase();
-  if (/tablet|ipad/.test(ua)) return 'tablet';
-  if (/mobile|android|iphone/.test(ua)) return 'mobile';
-  return 'desktop';
-}
-
-// Helper function to detect browser
-function detectBrowser(userAgent: string): string {
-  const ua = userAgent.toLowerCase();
-  if (ua.includes('whatsapp')) return 'whatsapp';
-  if (ua.includes('telegram')) return 'telegram';
-  if (ua.includes('chrome')) return 'chrome';
-  if (ua.includes('firefox')) return 'firefox';
-  if (ua.includes('safari') && !ua.includes('chrome')) return 'safari';
-  if (ua.includes('edge')) return 'edge';
-  if (ua.includes('opera')) return 'opera';
-  return 'other';
-}
-
-// Helper function to detect OS
-function detectOS(userAgent: string): string {
-  const ua = userAgent.toLowerCase();
-  if (ua.includes('windows')) return 'windows';
-  if (ua.includes('mac os')) return 'macos';
-  if (ua.includes('linux')) return 'linux';
-  if (ua.includes('android')) return 'android';
-  if (ua.includes('ios') || ua.includes('iphone') || ua.includes('ipad')) return 'ios';
-  return 'other';
-}
-
-// Helper function to get client IP
-function getClientIP(req: Request): string {
-  const forwardedFor = req.headers.get('x-forwarded-for');
-  const realIP = req.headers.get('x-real-ip');
-  
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim();
-  }
-  if (realIP) {
-    return realIP;
-  }
-  return 'unknown';
-}
-
-// Helper function to generate fingerprint for unique detection
-function generateFingerprint(ip: string, userAgent: string): string {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`${ip}:${userAgent}`);
-  return crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  });
-}
-
-// Helper function to get geolocation from IP
-async function getGeolocation(ip: string) {
-  try {
-    if (ip === 'unknown' || ip.startsWith('192.168') || ip.startsWith('10.') || ip === '127.0.0.1') {
-      return {
-        country: 'US',
-        country_name: 'United States',
-        city: 'Unknown',
-        region: 'Unknown'
-      };
-    }
-
-    // Using ipapi.co for geolocation (free tier)
-    const response = await fetch(`https://ipapi.co/${ip}/json/`);
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        country: data.country_code || 'US',
-        country_name: data.country_name || 'United States',
-        city: data.city || 'Unknown',
-        region: data.region || 'Unknown',
-        latitude: data.latitude || null,
-        longitude: data.longitude || null
-      };
-    }
-  } catch (error) {
-    console.error('Geolocation error:', error);
-  }
-  
-  return {
-    country: 'US',
-    country_name: 'United States',
-    city: 'Unknown',
-    region: 'Unknown'
-  };
-}
-
 serve(async (req) => {
+  console.log('🔥 TRACK-CLICK: Function called with method:', req.method, 'at', new Date().toISOString());
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('Handling CORS preflight request');
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders
+    });
   }
 
   try {
+    // Get short code from request body (JSON) or URL path
+    let shortCode;
+    
+    try {
+      const requestBody = await req.json();
+      shortCode = requestBody.code;
+    } catch {
+      // Fallback to URL path parsing
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split('/');
+      shortCode = pathParts[pathParts.length - 1];
+    }
+    
+    if (!shortCode || shortCode === 'track-click') {
+      return new Response(JSON.stringify({
+        error: 'Short code is required'
+      }), {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const url = new URL(req.url);
-    const shortCode = url.searchParams.get('code');
-    
-    if (!shortCode) {
-      return new Response('Short code is required', { status: 400 });
-    }
-
-    // Get link from database
+    // Get the link from database (public access - no status filter)
     const { data: link, error: linkError } = await supabaseClient
       .from('links')
-      .select('*')
+      .select('id, original_url, password_hash, redirect_type, expires_at, status')
       .eq('short_code', shortCode)
-      .eq('status', 'active')
       .single();
 
     if (linkError || !link) {
-      return new Response('Link not found', { status: 404 });
+      return new Response(JSON.stringify({
+        error: 'Link not found'
+      }), {
+        status: 404,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
     }
 
-    // Check if link is expired
+    // Get client IP for tracking
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                    req.headers.get('x-real-ip') || 
+                    req.headers.get('cf-connecting-ip') ||
+                    '127.0.0.1';
+
+    // Check if link is active (only if status is explicitly set to inactive)
+    if (link.status && link.status !== 'active') {
+      return new Response(JSON.stringify({
+        error: 'Link is inactive'
+      }), {
+        status: 410,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    // Check if link has expired
     if (link.expires_at && new Date(link.expires_at) < new Date()) {
-      return new Response('Link has expired', { status: 410 });
+      return new Response(JSON.stringify({
+        error: 'Link has expired'
+      }), {
+        status: 410,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
     }
 
-    // Get request details
-    const userAgent = req.headers.get('user-agent') || '';
-    const referer = req.headers.get('referer') || '';
-    const acceptLanguage = req.headers.get('accept-language') || '';
-    const ip = getClientIP(req);
-    
-    // Parse user agent details
-    const deviceType = detectDevice(userAgent);
-    const browserType = detectBrowser(userAgent);
-    const osType = detectOS(userAgent);
-    
-    // Generate fingerprint for unique detection
-    const fingerprint = await generateFingerprint(ip, userAgent);
-    
-    // Check if this is a unique click (same fingerprint within 24 hours)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentClick } = await supabaseClient
+    // Check for password protection
+    if (link.password_hash) {
+      return new Response(JSON.stringify({
+        error: 'Password required',
+        requiresPassword: true
+      }), {
+        status: 401,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    // Get client IP and normalize for localhost
+    let normalizedIP = clientIP;
+    if (clientIP === '127.0.0.1' || clientIP === 'localhost' || clientIP === '::1') {
+      normalizedIP = '127.0.0.1';
+    }
+
+    // Check for unique click within last 24 hours
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: existingClick } = await supabaseClient
       .from('clicks')
       .select('id')
       .eq('link_id', link.id)
-      .eq('fingerprint', fingerprint)
-      .gte('clicked_at', twentyFourHoursAgo)
-      .limit(1)
-      .single();
+      .eq('ip_address', normalizedIP)
+      .gte('created_at', oneDayAgo)
+      .limit(1);
 
-    const isUnique = !recentClick;
+    const isUnique = !existingClick || existingClick.length === 0;
 
-    // Get geolocation
-    const location = await getGeolocation(ip);
+    // Get geolocation data quickly (skip if slow)
+    let geoData = {
+      country: 'Unknown',
+      country_name: 'Unknown',
+      city: 'Unknown',
+      region: 'Unknown'
+    };
+
+    try {
+      // Quick geolocation with 2 second timeout
+      const geoController = new AbortController();
+      const geoTimeout = setTimeout(() => geoController.abort(), 2000);
+      
+      const geoResponse = await fetch(`https://ipapi.co/${normalizedIP}/json/`, {
+        signal: geoController.signal
+      });
+      clearTimeout(geoTimeout);
+      
+      if (geoResponse.ok) {
+        const geo = await geoResponse.json();
+        geoData = {
+          country: geo.country_code || 'Unknown',
+          country_name: geo.country_name || 'Unknown',
+          city: geo.city || 'Unknown',
+          region: geo.region || 'Unknown'
+        };
+      }
+    } catch (geoError) {
+      console.log('Geolocation failed or timed out, using defaults:', geoError);
+    }
+
+    // Parse user agent for device/browser info
+    const userAgent = req.headers.get('user-agent') || '';
+    const referer = req.headers.get('referer') || 'Direct';
     
-    // Extract language
-    const language = acceptLanguage.split(',')[0]?.split('-')[0] || 'en';
+    // Simple user agent parsing
+    let deviceType = 'desktop';
+    let browser = 'Unknown';
+    let os = 'Unknown';
 
-    // Record the click
+    if (userAgent.includes('Mobile')) {
+      deviceType = 'mobile';
+    } else if (userAgent.includes('Tablet')) {
+      deviceType = 'tablet';
+    }
+
+    if (userAgent.includes('Chrome')) {
+      browser = 'Chrome';
+    } else if (userAgent.includes('Firefox')) {
+      browser = 'Firefox';
+    } else if (userAgent.includes('Safari')) {
+      browser = 'Safari';
+    } else if (userAgent.includes('Edge')) {
+      browser = 'Edge';
+    }
+
+    if (userAgent.includes('Windows')) {
+      os = 'Windows';
+    } else if (userAgent.includes('Mac')) {
+      os = 'macOS';
+    } else if (userAgent.includes('Linux')) {
+      os = 'Linux';
+    } else if (userAgent.includes('Android')) {
+      os = 'Android';
+    } else if (userAgent.includes('iOS')) {
+      os = 'iOS';
+    }
+
+    // Insert click record
+    console.log('🔥 TRACK-CLICK: About to insert click for link_id:', link.id, 'IP:', normalizedIP, 'isUnique:', isUnique);
     const { error: clickError } = await supabaseClient
       .from('clicks')
       .insert({
         link_id: link.id,
-        ip_address: ip,
+        ip_address: normalizedIP,
         user_agent: userAgent,
         referer: referer,
-        country: location.country,
-        country_name: location.country_name,
-        city: location.city,
-        region: location.region,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        country: geoData.country,
+        country_name: geoData.country_name,
+        city: geoData.city,
+        region: geoData.region,
+        browser: browser,
+        os: os,
         device_type: deviceType,
-        browser_type: browserType,
-        os_type: osType,
-        language: language,
-        fingerprint: fingerprint,
-        is_unique: isUnique
+        is_unique: isUnique,
+        fingerprint: `${normalizedIP}-${userAgent.slice(0, 50)}`
       });
 
     if (clickError) {
-      console.error('Failed to record click:', clickError);
+      console.error('❌ TRACK-CLICK: Error inserting click:', clickError);
+      // Still return redirect even if tracking fails
+      return new Response(JSON.stringify({
+        redirect: true,
+        url: link.original_url,
+        type: link.redirect_type || 'direct'
+      }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    } else {
+      console.log('✅ TRACK-CLICK: Click recorded successfully for link_id:', link.id);
     }
 
-    // Redirect to original URL
-    return new Response(null, {
-      status: 302,
+    // Update daily analytics using database-level increment to prevent double counting
+    console.log('🔥 TRACK-CLICK: About to update analytics for link_id:', link.id);
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Use PostgreSQL's ON CONFLICT to handle concurrent updates safely
+    const { error: analyticsError } = await supabaseClient
+      .rpc('increment_daily_analytics', {
+        p_link_id: link.id,
+        p_date: today,
+        p_is_unique: isUnique
+      });
+
+    if (analyticsError) {
+      console.error('❌ TRACK-CLICK: Error updating analytics:', analyticsError);
+      // Create a fallback manual update
+      try {
+        const { data: existingAnalytics } = await supabaseClient
+          .from('analytics_daily')
+          .select('id, total_clicks, unique_clicks')
+          .eq('link_id', link.id)
+          .eq('date', today)
+          .single();
+
+        if (existingAnalytics) {
+          await supabaseClient
+            .from('analytics_daily')
+            .update({
+              total_clicks: existingAnalytics.total_clicks + 1,
+              unique_clicks: isUnique ? (existingAnalytics.unique_clicks || 0) + 1 : (existingAnalytics.unique_clicks || 0)
+            })
+            .eq('id', existingAnalytics.id);
+        } else {
+          await supabaseClient
+            .from('analytics_daily')
+            .insert({
+              link_id: link.id,
+              date: today,
+              total_clicks: 1,
+              unique_clicks: isUnique ? 1 : 0
+            });
+        }
+      } catch (fallbackError) {
+        console.error('❌ TRACK-CLICK: Fallback analytics update failed:', fallbackError);
+      }
+    } else {
+      console.log('✅ TRACK-CLICK: Analytics updated successfully using RPC for link_id:', link.id);
+    }
+
+    // Return redirect information
+    return new Response(JSON.stringify({
+      redirect: true,
+      url: link.original_url,
+      type: link.redirect_type || 'direct'
+    }), {
+      status: 200,
       headers: {
-        'Location': link.original_url,
-        ...corsHeaders
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       }
     });
 
   } catch (error) {
     console.error('Function error:', error);
-    return new Response('Internal server error', { status: 500 });
+    console.error('Error details:', error.message, error.stack);
+    return new Response(JSON.stringify({
+      error: 'Internal server error',
+      message: error.message
+    }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
   }
 });

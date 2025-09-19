@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 const TrafficOverview = () => {
-  const [startDate, setStartDate] = useState<Date>(new Date(2025, 6, 15)); // July 15, 2025
-  const [endDate, setEndDate] = useState<Date>(new Date(2025, 6, 29)); // July 29, 2025
+  const [startDate, setStartDate] = useState<Date>(new Date(2025, 8, 1)); // September 1, 2025
+  const [endDate, setEndDate] = useState<Date>(new Date(2025, 8, 30)); // September 30, 2025
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const { analytics, loading } = useAnalytics(startDate, endDate);
@@ -20,6 +20,19 @@ const TrafficOverview = () => {
   };
 
   const maxClicks = Math.max(...(analytics.chartData || []).map(d => d.clicks), 1);
+  // Create Y-axis labels with proper increments (0, 10, 20, 30, etc.)
+  const getYAxisLabels = (max: number) => {
+    if (max <= 10) {
+      return Array.from({ length: max + 1 }, (_, i) => i);
+    } else if (max <= 50) {
+      const step = Math.ceil(max / 5);
+      return Array.from({ length: 6 }, (_, i) => i * step);
+    } else {
+      const step = Math.ceil(max / 5);
+      return Array.from({ length: 6 }, (_, i) => i * step);
+    }
+  };
+  const yAxisLabels = getYAxisLabels(maxClicks);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -162,7 +175,8 @@ const TrafficOverview = () => {
           <div className="relative bg-surface-secondary/30 rounded-lg p-4">
             <div className="flex items-end justify-between h-72 space-x-2">
               {(analytics.chartData || []).map((data, index) => {
-                const height = (data.clicks / maxClicks) * 100;
+                const maxYAxis = Math.max(...yAxisLabels);
+                const height = (data.clicks / maxYAxis) * 100;
                 return (
                   <div key={index} className="flex-1 flex flex-col items-center group relative">
                     <div 
@@ -172,10 +186,21 @@ const TrafficOverview = () => {
                         minHeight: '8px'
                       }}
                     >
-                      {/* Enhanced Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-card border border-card-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-20 animate-scale-in">
-                        <div className="text-sm font-semibold text-card-foreground">{data.date}</div>
-                        <div className="text-sm text-primary font-medium">{data.clicks} clicks</div>
+                      {/* Enhanced Tooltip with URL Breakdown */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-card border border-card-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 animate-scale-in min-w-48">
+                        <div className="text-sm font-semibold text-card-foreground mb-2">{data.date}</div>
+                        <div className="text-sm text-primary font-medium mb-2">{data.clicks} total clicks</div>
+                        {data.urlBreakdown && (
+                          <div className="text-xs text-muted-foreground">
+                            <div className="font-medium text-card-foreground mb-1">URL Breakdown:</div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between">
+                                <span className="truncate max-w-32">{data.urlBreakdown.shortCode || 'Unknown'}</span>
+                                <span className="text-primary font-medium">{data.urlBreakdown.clicks} clicks</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-card border-r border-b border-card-border rotate-45"></div>
                       </div>
                     </div>
@@ -189,11 +214,9 @@ const TrafficOverview = () => {
             
             {/* Y-axis labels */}
             <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-muted-foreground py-4">
-              <span>{maxClicks}</span>
-              <span>{Math.round(maxClicks * 0.75)}</span>
-              <span>{Math.round(maxClicks * 0.5)}</span>
-              <span>{Math.round(maxClicks * 0.25)}</span>
-              <span>0</span>
+              {yAxisLabels.slice().reverse().map((label, index) => (
+                <span key={index}>{label}</span>
+              ))}
             </div>
           </div>
         </div>
