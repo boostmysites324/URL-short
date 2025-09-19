@@ -23,13 +23,18 @@ serve(async (req) => {
   }
 
   try {
-    // Get short code from request body (JSON) or URL path
-    let shortCode;
-    
+    // Parse request body once
+    let requestBody = {};
     try {
-      const requestBody = await req.json();
-      shortCode = requestBody.code;
-    } catch {
+      requestBody = await req.json();
+    } catch (e) {
+      console.log('No request body or invalid JSON');
+    }
+    
+    // Get short code from request body or URL path
+    let shortCode = requestBody.code;
+    
+    if (!shortCode) {
       // Fallback to URL path parsing
       const url = new URL(req.url);
       const pathParts = url.pathname.split('/');
@@ -56,7 +61,7 @@ serve(async (req) => {
     // Get the link from database (public access - no status filter)
     const { data: link, error: linkError } = await supabaseClient
       .from('links')
-      .select('id, original_url, password_hash, redirect_type, expires_at, status')
+      .select('id, original_url, password_hash, redirect_type, expires_at, status, analytics_enabled')
       .eq('short_code', shortCode)
       .single();
 
@@ -104,19 +109,57 @@ serve(async (req) => {
       });
     }
 
-    // Check for password protection
+    // Check if link is password protected
     if (link.password_hash) {
-      return new Response(JSON.stringify({
-        error: 'Password required',
-        requiresPassword: true
-      }), {
-        status: 401,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+      const { password } = requestBody;
+      
+      if (!password) {
+        console.log('🔒 Password required for link:', link.id);
+        return new Response(JSON.stringify({
+          error: 'Password required',
+          requiresPassword: true
+        }), {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
+      // Verify password
+      console.log('🔐 Verifying password for link:', link.id);
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const providedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      console.log('🔐 Password hash comparison:', {
+        provided: providedHash.substring(0, 10) + '...',
+        stored: link.password_hash.substring(0, 10) + '...',
+        match: providedHash === link.password_hash
       });
+
+      if (providedHash !== link.password_hash) {
+        console.log('❌ Invalid password for link:', link.id);
+        return new Response(JSON.stringify({
+          error: 'Invalid password',
+          requiresPassword: true
+        }), {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+      
+      console.log('✅ Password verified for link:', link.id);
     }
+
+    // Skip analytics if disabled for this link
+    const shouldTrackAnalytics = link.analytics_enabled !== false;
 
     // Get client IP and normalize for localhost
     let normalizedIP = clientIP;
@@ -204,90 +247,98 @@ serve(async (req) => {
       os = 'iOS';
     }
 
-    // Insert click record
-    console.log('🔥 TRACK-CLICK: About to insert click for link_id:', link.id, 'IP:', normalizedIP, 'isUnique:', isUnique);
-    const { error: clickError } = await supabaseClient
-      .from('clicks')
-      .insert({
-        link_id: link.id,
-        ip_address: normalizedIP,
-        user_agent: userAgent,
-        referer: referer,
-        country: geoData.country,
-        country_name: geoData.country_name,
-        city: geoData.city,
-        region: geoData.region,
-        browser: browser,
-        os: os,
-        device_type: deviceType,
-        is_unique: isUnique,
-        fingerprint: `${normalizedIP}-${userAgent.slice(0, 50)}`
-      });
+    // Insert click record only if analytics is enabled
+    if (shouldTrackAnalytics) {
+      console.log('🔥 TRACK-CLICK: About to insert click for link_id:', link.id, 'IP:', normalizedIP, 'isUnique:', isUnique);
+      const { error: clickError } = await supabaseClient
+        .from('clicks')
+        .insert({
+          link_id: link.id,
+          ip_address: normalizedIP,
+          user_agent: userAgent,
+          referer: referer,
+          country: geoData.country,
+          country_name: geoData.country_name,
+          city: geoData.city,
+          region: geoData.region,
+          browser: browser,
+          os: os,
+          device_type: deviceType,
+          is_unique: isUnique,
+          fingerprint: `${normalizedIP}-${userAgent.slice(0, 50)}`
+        });
 
-    if (clickError) {
-      console.error('❌ TRACK-CLICK: Error inserting click:', clickError);
-      // Still return redirect even if tracking fails
-      return new Response(JSON.stringify({
-        redirect: true,
-        url: link.original_url,
-        type: link.redirect_type || 'direct'
-      }), {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
-    } else {
-      console.log('✅ TRACK-CLICK: Click recorded successfully for link_id:', link.id);
-    }
-
-    // Update daily analytics using database-level increment to prevent double counting
-    console.log('🔥 TRACK-CLICK: About to update analytics for link_id:', link.id);
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Use PostgreSQL's ON CONFLICT to handle concurrent updates safely
-    const { error: analyticsError } = await supabaseClient
-      .rpc('increment_daily_analytics', {
-        p_link_id: link.id,
-        p_date: today,
-        p_is_unique: isUnique
-      });
-
-    if (analyticsError) {
-      console.error('❌ TRACK-CLICK: Error updating analytics:', analyticsError);
-      // Create a fallback manual update
-      try {
-        const { data: existingAnalytics } = await supabaseClient
-          .from('analytics_daily')
-          .select('id, total_clicks, unique_clicks')
-          .eq('link_id', link.id)
-          .eq('date', today)
-          .single();
-
-        if (existingAnalytics) {
-          await supabaseClient
-            .from('analytics_daily')
-            .update({
-              total_clicks: existingAnalytics.total_clicks + 1,
-              unique_clicks: isUnique ? (existingAnalytics.unique_clicks || 0) + 1 : (existingAnalytics.unique_clicks || 0)
-            })
-            .eq('id', existingAnalytics.id);
-        } else {
-          await supabaseClient
-            .from('analytics_daily')
-            .insert({
-              link_id: link.id,
-              date: today,
-              total_clicks: 1,
-              unique_clicks: isUnique ? 1 : 0
-            });
-        }
-      } catch (fallbackError) {
-        console.error('❌ TRACK-CLICK: Fallback analytics update failed:', fallbackError);
+      if (clickError) {
+        console.error('❌ TRACK-CLICK: Error inserting click:', clickError);
+        // Still return redirect even if tracking fails
+        return new Response(JSON.stringify({
+          redirect: true,
+          url: link.original_url,
+          type: link.redirect_type || 'direct'
+        }), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      } else {
+        console.log('✅ TRACK-CLICK: Click recorded successfully for link_id:', link.id);
       }
     } else {
-      console.log('✅ TRACK-CLICK: Analytics updated successfully using RPC for link_id:', link.id);
+      console.log('📊 TRACK-CLICK: Analytics disabled for this link, skipping click tracking');
+    }
+
+    // Update daily analytics only if analytics is enabled
+    if (shouldTrackAnalytics) {
+      console.log('🔥 TRACK-CLICK: About to update analytics for link_id:', link.id);
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Use PostgreSQL's ON CONFLICT to handle concurrent updates safely
+      const { error: analyticsError } = await supabaseClient
+        .rpc('increment_daily_analytics', {
+          p_link_id: link.id,
+          p_date: today,
+          p_is_unique: isUnique
+        });
+
+      if (analyticsError) {
+        console.error('❌ TRACK-CLICK: Error updating analytics:', analyticsError);
+        // Create a fallback manual update
+        try {
+          const { data: existingAnalytics } = await supabaseClient
+            .from('analytics_daily')
+            .select('id, total_clicks, unique_clicks')
+            .eq('link_id', link.id)
+            .eq('date', today)
+            .single();
+
+          if (existingAnalytics) {
+            await supabaseClient
+              .from('analytics_daily')
+              .update({
+                total_clicks: existingAnalytics.total_clicks + 1,
+                unique_clicks: isUnique ? (existingAnalytics.unique_clicks || 0) + 1 : (existingAnalytics.unique_clicks || 0)
+              })
+              .eq('id', existingAnalytics.id);
+          } else {
+            await supabaseClient
+              .from('analytics_daily')
+              .insert({
+                link_id: link.id,
+                date: today,
+                total_clicks: 1,
+                unique_clicks: isUnique ? 1 : 0
+              });
+          }
+        } catch (fallbackError) {
+          console.error('❌ TRACK-CLICK: Fallback analytics update failed:', fallbackError);
+        }
+      } else {
+        console.log('✅ TRACK-CLICK: Analytics updated successfully using RPC for link_id:', link.id);
+      }
+    } else {
+      console.log('📊 TRACK-CLICK: Analytics disabled for this link, skipping analytics update');
     }
 
     // Return redirect information

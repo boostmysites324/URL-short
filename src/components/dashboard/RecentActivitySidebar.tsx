@@ -71,7 +71,7 @@ const RecentActivitySidebar = () => {
             short_url: link.short_url
           };
           
-          setActivities(prev => [newActivity, ...prev.slice(0, 19)]); // Keep only 20 items
+          setActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep only 10 items
           console.log('✅ Added new activity in real-time:', newActivity);
         }
       })
@@ -133,7 +133,7 @@ const RecentActivitySidebar = () => {
         .select('*')
         .in('link_id', linkIds)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(10);
 
       console.log('Recent Activity - User ID:', user.id);
       console.log('Recent Activity - Link IDs:', linkIds);

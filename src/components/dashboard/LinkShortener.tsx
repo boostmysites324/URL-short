@@ -1,12 +1,14 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useLinks } from "@/hooks/useLinks";
@@ -17,6 +19,7 @@ import BulkActions from "@/components/links/BulkActions";
 import ShortLinkModal from "@/components/shortener/ShortLinkModal";
 import RecentActivitySidebar from "@/components/dashboard/RecentActivitySidebar";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const LinkShortener = () => {
   const [inputUrl, setInputUrl] = useState("");
@@ -28,7 +31,15 @@ const LinkShortener = () => {
     customDomain: false,
     analytics: true,
     expiration: false,
-    password: false
+    password: false,
+    customDomainUrl: "",
+    expirationDate: undefined as Date | undefined,
+    passwordValue: "",
+    domainValidation: {
+      isValid: false,
+      isChecking: false,
+      message: ""
+    }
   });
   const [showShortLinkModal, setShowShortLinkModal] = useState(false);
   const [newShortLink, setNewShortLink] = useState<{
@@ -52,6 +63,52 @@ const LinkShortener = () => {
     } catch (_) {
       return false;
     }
+  };
+
+  // Domain validation function
+  const validateDomain = async (domain: string) => {
+    if (!domain) return;
+    
+    setSettings(prev => ({
+      ...prev,
+      domainValidation: { isValid: false, isChecking: true, message: "Validating domain..." }
+    }));
+
+    try {
+      // Basic domain format validation
+      const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
+      if (!domainRegex.test(domain)) {
+        setSettings(prev => ({
+          ...prev,
+          domainValidation: { isValid: false, isChecking: false, message: "Invalid domain format" }
+        }));
+        return;
+      }
+
+      // Check if domain is reachable
+      const response = await fetch(`https://${domain}`, { 
+        method: 'HEAD', 
+        mode: 'no-cors',
+        signal: AbortSignal.timeout(5000)
+      });
+      
+      setSettings(prev => ({
+        ...prev,
+        domainValidation: { isValid: true, isChecking: false, message: "Domain is valid and reachable" }
+      }));
+    } catch (error) {
+      setSettings(prev => ({
+        ...prev,
+        domainValidation: { isValid: false, isChecking: false, message: "Domain is not reachable or invalid" }
+      }));
+    }
+  };
+
+  // Convert IST date to UTC for database storage
+  const convertISTToUTC = (istDate: Date) => {
+    // IST is UTC+5:30, so we need to subtract 5.5 hours to get UTC
+    const utcDate = new Date(istDate.getTime() - (5.5 * 60 * 60 * 1000));
+    return utcDate.toISOString();
   };
 
   const handleShorten = async () => {
@@ -85,11 +142,40 @@ const LinkShortener = () => {
 
     try {
       console.log('About to call shortenUrl with:', inputUrl);
+      
+      // Validate settings before proceeding
+      if (settings.customDomain && (!settings.customDomainUrl || !settings.domainValidation.isValid)) {
+        toast({
+          title: "Invalid Domain",
+          description: "Please enter a valid custom domain",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (settings.password && !settings.passwordValue.trim()) {
+        toast({
+          title: "Password Required",
+          description: "Please enter a password for the protected link",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (settings.expiration && !settings.expirationDate) {
+        toast({
+          title: "Expiration Date Required",
+          description: "Please set an expiration date",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const linkSettings = {
-        customDomain: settings.customDomain ? "short.ly" : undefined,
+        customDomain: settings.customDomain && settings.domainValidation.isValid ? settings.customDomainUrl : undefined,
         analyticsEnabled: settings.analytics,
-        expiresAt: settings.expiration ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
-        password: settings.password ? "password123" : undefined
+        expiresAt: settings.expiration && settings.expirationDate ? convertISTToUTC(settings.expirationDate) : undefined,
+        password: settings.password && settings.passwordValue ? settings.passwordValue : undefined
       };
 
       console.log('Link settings:', linkSettings);
@@ -252,7 +338,7 @@ const LinkShortener = () => {
     link.original_url.toLowerCase().includes(searchTerm.toLowerCase()) ||
     link.short_url.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ).slice(0, 10); // Show only last 10 links
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
@@ -324,24 +410,56 @@ const LinkShortener = () => {
                     <Settings className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md bg-card border-card-border">
+                <DialogContent className="sm:max-w-lg bg-card border-card-border">
                   <DialogHeader>
                     <DialogTitle className="text-card-foreground">Link Settings</DialogTitle>
+                    <DialogDescription className="text-muted-foreground">
+                      Configure your link settings before shortening URLs
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="custom-domain" className="text-sm font-medium text-card-foreground">
-                        Use Custom Domain
-                      </Label>
-                      <Switch 
-                        id="custom-domain"
-                        checked={settings.customDomain}
-                        onCheckedChange={(checked) => setSettings({...settings, customDomain: checked})}
-                      />
+                    {/* Custom Domain */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="custom-domain" className="text-sm font-medium text-card-foreground flex items-center gap-2">
+                          <Globe className="w-4 h-4" />
+                          Use Custom Domain
+                        </Label>
+                        <Switch 
+                          id="custom-domain"
+                          checked={settings.customDomain}
+                          onCheckedChange={(checked) => setSettings({...settings, customDomain: checked})}
+                        />
+                      </div>
+                      {settings.customDomain && (
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Enter your domain (e.g., mydomain.com)"
+                            value={settings.customDomainUrl}
+                            onChange={(e) => {
+                              setSettings({...settings, customDomainUrl: e.target.value});
+                              if (e.target.value) {
+                                validateDomain(e.target.value);
+                              }
+                            }}
+                            className="w-full"
+                          />
+                          {settings.domainValidation.isChecking && (
+                            <p className="text-xs text-blue-500">Validating domain...</p>
+                          )}
+                          {settings.domainValidation.message && !settings.domainValidation.isChecking && (
+                            <p className={`text-xs ${settings.domainValidation.isValid ? 'text-green-500' : 'text-red-500'}`}>
+                              {settings.domainValidation.message}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     
+                    {/* Analytics */}
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="analytics" className="text-sm font-medium text-card-foreground">
+                      <Label htmlFor="analytics" className="text-sm font-medium text-card-foreground flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
                         Enable Analytics
                       </Label>
                       <Switch 
@@ -351,26 +469,82 @@ const LinkShortener = () => {
                       />
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="expiration" className="text-sm font-medium text-card-foreground">
-                        Set Expiration
-                      </Label>
-                      <Switch 
-                        id="expiration"
-                        checked={settings.expiration}
-                        onCheckedChange={(checked) => setSettings({...settings, expiration: checked})}
-                      />
+                    {/* Expiration */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="expiration" className="text-sm font-medium text-card-foreground flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          Set Expiration
+                        </Label>
+                        <Switch 
+                          id="expiration"
+                          checked={settings.expiration}
+                          onCheckedChange={(checked) => setSettings({...settings, expiration: checked})}
+                        />
+                      </div>
+                      {settings.expiration && (
+                        <div className="space-y-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !settings.expirationDate && "text-muted-foreground"
+                                )}
+                              >
+                                <Calendar className="mr-2 h-4 w-4" />
+                                {settings.expirationDate ? (
+                                  format(settings.expirationDate, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={settings.expirationDate}
+                                onSelect={(date) => setSettings({...settings, expirationDate: date})}
+                                disabled={(date) => date < new Date()}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <p className="text-xs text-muted-foreground">
+                            Expiration time will be set in IST (Indian Standard Time)
+                          </p>
+                        </div>
+                      )}
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="password" className="text-sm font-medium text-card-foreground">
-                        Password Protection
-                      </Label>
-                      <Switch 
-                        id="password"
-                        checked={settings.password}
-                        onCheckedChange={(checked) => setSettings({...settings, password: checked})}
-                      />
+                    {/* Password Protection */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password" className="text-sm font-medium text-card-foreground flex items-center gap-2">
+                          <Lock className="w-4 h-4" />
+                          Password Protection
+                        </Label>
+                        <Switch 
+                          id="password"
+                          checked={settings.password}
+                          onCheckedChange={(checked) => setSettings({...settings, password: checked})}
+                        />
+                      </div>
+                      {settings.password && (
+                        <div className="space-y-2">
+                          <Input
+                            type="password"
+                            placeholder="Enter password for this link"
+                            value={settings.passwordValue}
+                            onChange={(e) => setSettings({...settings, passwordValue: e.target.value})}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Users will need this password to access the shortened link
+                          </p>
+                        </div>
+                      )}
                     </div>
                     
                     <Button 

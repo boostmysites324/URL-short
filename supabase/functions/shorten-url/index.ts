@@ -109,12 +109,20 @@ serve(async (req) => {
       );
     }
 
-    // Generate a simple short URL that will work locally
-    // For development, use localhost with a simple redirect setup
-    let domain = 'http://localhost:8081';
+    // Generate short URL with custom domain or default
+    let domain = 'http://localhost:8081'; // Default for development
+    let shortUrl = '';
     
-    console.log('Using localhost domain:', domain);
-    const shortUrl = `${domain}/s/${shortCode}`;
+    if (customDomain) {
+      // Use custom domain if provided and valid
+      domain = `https://${customDomain}`;
+      shortUrl = `${domain}/${shortCode}`;
+      console.log('Using custom domain:', domain);
+    } else {
+      // Use default localhost for development
+      shortUrl = `${domain}/s/${shortCode}`;
+      console.log('Using default domain:', domain);
+    }
 
     // Hash password if provided
     let passwordHash = null;
