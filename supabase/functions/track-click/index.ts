@@ -61,7 +61,7 @@ serve(async (req) => {
     // Get the link from database (public access - no status filter)
     const { data: link, error: linkError } = await supabaseClient
       .from('links')
-      .select('id, original_url, password_hash, redirect_type, expires_at, status, analytics_enabled')
+      .select('id, original_url, password_hash, redirect_type, expires_at, status, analytics_enabled, is_archived')
       .eq('short_code', shortCode)
       .single();
 
@@ -158,8 +158,8 @@ serve(async (req) => {
       console.log('✅ Password verified for link:', link.id);
     }
 
-    // Skip analytics if disabled for this link
-    const shouldTrackAnalytics = link.analytics_enabled !== false;
+    // Skip analytics if disabled for this link or if link is archived
+    const shouldTrackAnalytics = link.analytics_enabled !== false && !link.is_archived;
 
     // Get client IP and normalize for localhost
     let normalizedIP = clientIP;

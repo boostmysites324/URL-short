@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./components/auth/AuthPage";
 import Redirect from "./pages/Redirect";
+import Statistics from "./pages/Statistics";
+import Archives from "./pages/Archives";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,8 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/s/:shortCode" element={<Redirect />} />
+        <Route path="/statistics/:linkId" element={<Statistics />} />
+        <Route path="/archives" element={<Archives />} />
         <Route 
           path="/" 
           element={user ? <Index /> : <AuthPage />} 

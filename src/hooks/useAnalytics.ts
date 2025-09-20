@@ -242,28 +242,35 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
     fetchAnalytics();
     fetchRecentActivity();
 
-    // Subscribe to real-time updates - only listen to analytics_daily changes
-    const subscription = supabase
-      .channel('analytics-changes')
+    // Set up real-time subscriptions for analytics updates
+    const analyticsSubscription = supabase
+      .channel('analytics-realtime')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'analytics_daily'
       }, (payload) => {
-        console.log('Real-time analytics update:', payload);
-        fetchAnalytics();
+        console.log('📊 Real-time analytics update:', payload);
+        fetchAnalytics(); // Refresh analytics when daily data changes
       })
       .subscribe();
 
-    // Also set up a periodic refresh as a fallback (reduced frequency)
-    const refreshInterval = setInterval(() => {
-      fetchAnalytics();
-      fetchRecentActivity();
-    }, 120000); // Refresh every 2 minutes (silent)
+    // Set up real-time subscription for recent activity
+    const activitySubscription = supabase
+      .channel('activity-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'clicks'
+      }, (payload) => {
+        console.log('🔥 Real-time click detected:', payload);
+        fetchRecentActivity(); // Refresh recent activity when new click is added
+      })
+      .subscribe();
 
     return () => {
-      supabase.removeChannel(subscription);
-      clearInterval(refreshInterval);
+      supabase.removeChannel(analyticsSubscription);
+      supabase.removeChannel(activitySubscription);
     };
   }, [startDate, endDate]);
 

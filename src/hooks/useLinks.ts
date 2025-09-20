@@ -43,7 +43,7 @@ export const useLinks = () => {
         console.log('Fetching links for user:', user.id);
       }
       
-      // Get links with click counts for current user only
+      // Get links with click counts for current user only (exclude archived)
       const { data: linksData, error: linksError } = await supabase
         .from('links')
         .select(`
@@ -54,6 +54,7 @@ export const useLinks = () => {
           )
         `)
         .eq('user_id', user.id)
+        .eq('is_archived', false)
         .order('created_at', { ascending: false });
 
       if (linksError) {
@@ -162,33 +163,8 @@ export const useLinks = () => {
   };
 
   useEffect(() => {
-    // Initial fetch with logs
+    // Initial fetch only - no automatic refreshes
     fetchLinks(true);
-
-    // Subscribe to real-time updates for individual link updates - only analytics_daily
-    const subscription = supabase
-      .channel('links-fast-updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'analytics_daily'
-      }, (payload) => {
-        console.log('📊 Analytics updated! Refreshing link counts...');
-        fetchLinks(false);
-      })
-      .subscribe((status) => {
-        console.log('Links subscription status:', status);
-      });
-
-    // More frequent refresh for faster individual link updates
-    const refreshInterval = setInterval(() => {
-      fetchLinks(false); // Silent refresh
-    }, 10000); // Refresh every 10 seconds for faster individual updates
-
-    return () => {
-      supabase.removeChannel(subscription);
-      clearInterval(refreshInterval);
-    };
   }, []);
 
   return {

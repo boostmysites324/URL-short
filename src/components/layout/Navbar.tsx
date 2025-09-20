@@ -1,13 +1,15 @@
-import { Link, Command, User, Moon, Sun } from "lucide-react";
+import { Link, Command, User, Moon, Sun, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useNavigate } from "react-router-dom";
 import QuickShortenerModal from "@/components/shortener/QuickShortenerModal";
 
 const Navbar = () => {
   const [isDark, setIsDark] = useState(false);
   const [isQuickShortenerOpen, setIsQuickShortenerOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Check for saved theme preference or default to light
@@ -53,8 +55,8 @@ const Navbar = () => {
             </span>
           </div>
 
-          {/* Center - Quick Shortener */}
-          <div className="hidden md:flex items-center animate-scale-in">
+          {/* Center - Quick Shortener & Archives */}
+          <div className="hidden md:flex items-center space-x-2 animate-scale-in">
             <Button 
               variant="ghost" 
               onClick={() => setIsQuickShortenerOpen(true)}
@@ -65,6 +67,15 @@ const Navbar = () => {
               <kbd className="pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded-md border border-border bg-muted px-2 font-mono text-[11px] font-medium text-muted-foreground shadow-sm">
                 CTRL + K
               </kbd>
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/archives')}
+              className="flex items-center space-x-2 text-muted-foreground hover:text-card-foreground hover:bg-surface-secondary/80 transition-all duration-300 rounded-lg px-4 py-2 group"
+            >
+              <Archive className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="font-medium">Archives</span>
             </Button>
           </div>
 

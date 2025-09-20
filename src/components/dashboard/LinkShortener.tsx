@@ -11,6 +11,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe, Share, BarChart3, Edit, Archive, Eye, QrCode, Download, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useLinks } from "@/hooks/useLinks";
 import { useDomains } from "@/hooks/useDomains";
@@ -19,10 +20,13 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import BulkActions from "@/components/links/BulkActions";
 import ShortLinkModal from "@/components/shortener/ShortLinkModal";
 import RecentActivitySidebar from "@/components/dashboard/RecentActivitySidebar";
+import EditUrlModal from "@/components/links/EditUrlModal";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const LinkShortener = () => {
+  const navigate = useNavigate();
   const [inputUrl, setInputUrl] = useState("");
   const [mode, setMode] = useState<"single" | "multiple">("single");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -56,6 +60,8 @@ const LinkShortener = () => {
     linkId: string;
     createdAt: string;
   } | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editLink, setEditLink] = useState<any>(null);
   
   const { toast } = useToast();
   const { links, loading, shortenUrl, refreshLinks } = useLinks();
@@ -329,6 +335,194 @@ const LinkShortener = () => {
       createdAt: link.created_at
     });
     setShowShareModal(true);
+  };
+
+  const handleStatisticsClick = (link: any) => {
+    navigate(`/statistics/${link.id}`);
+  };
+
+  const handleEditClick = (link: any) => {
+    setEditLink(link);
+    setShowEditModal(true);
+  };
+
+  const handleArchiveClick = async (link: any) => {
+    try {
+      const { error } = await supabase
+        .from('links')
+        .update({ is_archived: true })
+        .eq('id', link.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Link archived successfully",
+      });
+
+      refreshLinks();
+    } catch (error) {
+      console.error('Error archiving link:', error);
+      toast({
+        title: "Error",
+        description: "Failed to archive link",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportStatistics = async (link: any) => {
+    try {
+      // Fetch detailed click data for this link
+      const { data: clicksData, error: clicksError } = await supabase
+        .from('clicks')
+        .select('*')
+        .eq('link_id', link.id)
+        .order('created_at', { ascending: false });
+
+      if (clicksError) throw clicksError;
+
+      if (!clicksData || clicksData.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No click data available for this link",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Prepare CSV data
+      const csvHeaders = [
+        'Date',
+        'Time',
+        'Country',
+        'City',
+        'Region',
+        'IP Address',
+        'Device Type',
+        'Browser',
+        'Operating System',
+        'User Agent',
+        'Referrer',
+        'Is Unique Click'
+      ];
+
+      const csvRows = clicksData.map(click => [
+        new Date(click.created_at).toLocaleDateString(),
+        new Date(click.created_at).toLocaleTimeString(),
+        click.country_name || click.country || 'Unknown',
+        click.city || 'Unknown',
+        click.region || 'Unknown',
+        click.ip_address || 'Unknown',
+        click.device_type || 'Unknown',
+        click.browser || 'Unknown',
+        click.os || 'Unknown',
+        click.user_agent || 'Unknown',
+        click.referer || 'Direct',
+        click.is_unique ? 'Yes' : 'No'
+      ]);
+
+      // Create CSV content
+      const csvContent = [
+        csvHeaders.join(','),
+        ...csvRows.map(row => row.map(field => `"${field}"`).join(','))
+      ].join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const downloadLink = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      downloadLink.setAttribute('href', url);
+      downloadLink.setAttribute('download', `statistics_${link.short_code}_${new Date().toISOString().split('T')[0]}.csv`);
+      downloadLink.style.visibility = 'hidden';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      toast({
+        title: "Success",
+        description: "Statistics exported successfully",
+      });
+    } catch (error) {
+      console.error('Error exporting statistics:', error);
+      toast({
+        title: "Error",
+        description: "Failed to export statistics",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleResetStats = async (link: any) => {
+    if (!confirm('Are you sure you want to reset all statistics for this link? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      // Delete all clicks for this link
+      const { error: clicksError } = await supabase
+        .from('clicks')
+        .delete()
+        .eq('link_id', link.id);
+
+      if (clicksError) throw clicksError;
+
+      // Delete all analytics_daily for this link
+      const { error: analyticsError } = await supabase
+        .from('analytics_daily')
+        .delete()
+        .eq('link_id', link.id);
+
+      if (analyticsError) throw analyticsError;
+
+      toast({
+        title: "Success",
+        description: "Statistics reset successfully",
+      });
+
+      refreshLinks();
+    } catch (error) {
+      console.error('Error resetting statistics:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset statistics",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteLink = async (link: any) => {
+    if (!confirm('Are you sure you want to permanently delete this link? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      // Delete all related data first
+      await supabase.from('clicks').delete().eq('link_id', link.id);
+      await supabase.from('analytics_daily').delete().eq('link_id', link.id);
+      
+      // Delete the link itself
+      const { error } = await supabase
+        .from('links')
+        .delete()
+        .eq('id', link.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Link deleted permanently",
+      });
+
+      refreshLinks();
+    } catch (error) {
+      console.error('Error deleting link:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete link",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleLinkSelection = (linkId: string) => {
@@ -780,37 +974,40 @@ const LinkShortener = () => {
                                 <Share className="w-4 h-4 mr-2" />
                                 Share
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatisticsClick(link)}>
                                 <BarChart3 className="w-4 h-4 mr-2" />
                                 Statistics
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditClick(link)}>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleArchiveClick(link)}>
                                 <Archive className="w-4 h-4 mr-2" />
                                 Archive
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              {/* <DropdownMenuItem>
                                 <Eye className="w-4 h-4 mr-2" />
                                 Set Public
                               </DropdownMenuItem>
                               <DropdownMenuItem>
                                 <QrCode className="w-4 h-4 mr-2" />
                                 Custom QR Code
-                              </DropdownMenuItem>
+                              </DropdownMenuItem> */}
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExportStatistics(link)}>
                                 <Download className="w-4 h-4 mr-2" />
                                 Export Statistics
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleResetStats(link)}>
                                 <RotateCcw className="w-4 h-4 mr-2" />
                                 Reset Stats
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600 focus:text-red-600">
+                              <DropdownMenuItem 
+                                className="text-red-600 focus:text-red-600"
+                                onClick={() => handleDeleteLink(link)}
+                              >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -860,6 +1057,19 @@ const LinkShortener = () => {
           originalUrl={shareLink.originalUrl}
           linkId={shareLink.linkId}
           createdAt={shareLink.createdAt}
+        />
+      )}
+
+      {/* Edit URL Modal */}
+      {showEditModal && editLink && (
+        <EditUrlModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditLink(null);
+          }}
+          link={editLink}
+          onUpdate={refreshLinks}
         />
       )}
     </div>
