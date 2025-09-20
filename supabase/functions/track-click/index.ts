@@ -160,6 +160,13 @@ serve(async (req) => {
 
     // Skip analytics if disabled for this link or if link is archived
     const shouldTrackAnalytics = link.analytics_enabled !== false && !link.is_archived;
+    
+    console.log('📊 TRACK-CLICK: Analytics tracking decision:', {
+      linkId: link.id,
+      analyticsEnabled: link.analytics_enabled,
+      isArchived: link.is_archived,
+      shouldTrack: shouldTrackAnalytics
+    });
 
     // Get client IP and normalize for localhost
     let normalizedIP = clientIP;

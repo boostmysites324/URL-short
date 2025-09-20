@@ -39,33 +39,44 @@ export const useLinks = () => {
         return;
       }
       
+      console.log('🔗🔄 fetchLinks called - showLogs:', showLogs, 'user:', user?.id);
+      
       if (showLogs) {
         console.log('Fetching links for user:', user.id);
       }
       
-      // Get links with click counts for current user only (exclude archived)
-      const { data: linksData, error: linksError } = await supabase
+      // Get links for current user only (exclude archived)
+      const result = await (supabase as any)
         .from('links')
-        .select(`
-          *,
-          analytics_daily(
-            total_clicks,
-            unique_clicks
-          )
-        `)
+        .select('id, original_url, short_code, short_url, title, status, created_at, expires_at, analytics_enabled')
         .eq('user_id', user.id)
         .eq('is_archived', false)
         .order('created_at', { ascending: false });
+      
+      const { data: linksData, error: linksError } = result;
 
       if (linksError) {
         console.error('Error fetching links:', linksError);
         throw linksError;
       }
 
-      // Process links to include total click counts
-      const processedLinks = linksData?.map(link => {
-        const totalClicks = link.analytics_daily?.reduce((sum: number, day: any) => sum + (day.total_clicks || 0), 0) || 0;
-        const uniqueClicks = link.analytics_daily?.reduce((sum: number, day: any) => sum + (day.unique_clicks || 0), 0) || 0;
+      // Process links to include total click counts from actual clicks table
+      const processedLinks = await Promise.all(linksData?.map(async (link) => {
+        // Get actual click counts from clicks table
+        const { data: clicksData, error: clicksError } = await supabase
+          .from('clicks')
+          .select('id, ip_address, clicked_at')
+          .eq('link_id', link.id);
+        
+        if (clicksError) {
+          console.error(`Error fetching clicks for link ${link.short_code}:`, clicksError);
+        }
+        
+        const totalClicks = clicksData?.length || 0;
+        
+        // Calculate unique clicks based on IP address
+        const uniqueIPs = new Set(clicksData?.map(click => click.ip_address).filter(Boolean) || []);
+        const uniqueClicks = uniqueIPs.size;
         
         if (showLogs) {
           console.log(`Link ${link.short_code}: total=${totalClicks}, unique=${uniqueClicks}`);
@@ -76,12 +87,20 @@ export const useLinks = () => {
           total_clicks: totalClicks,
           unique_clicks: uniqueClicks
         };
-      }) || [];
+      }) || []);
 
+      console.log('🔗📊 Processed links with updated counts:', processedLinks.map(l => `${l.short_code}: ${l.total_clicks}/${l.unique_clicks}`));
+      
       if (showLogs) {
         console.log('Processed links:', processedLinks);
       }
       setLinks(processedLinks);
+      console.log('🔗✅ Links state updated with new counts');
+      
+      // Force a re-render to ensure UI updates
+      if (processedLinks.length > 0) {
+        console.log('🔗🔄 Forcing UI update for individual link cards');
+      }
     } catch (error) {
       console.error('Error fetching links:', error);
       toast({
@@ -165,6 +184,25 @@ export const useLinks = () => {
   useEffect(() => {
     // Initial fetch only - no automatic refreshes
     fetchLinks(true);
+
+    // Set up real-time subscription for link updates
+    console.log('🔗🔧 useLinks: Setting up links subscription');
+    const linksSubscription = supabase
+      .channel('links-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'clicks'
+      }, (payload) => {
+        console.log('🔗📊 useLinks: Real-time click detected:', payload);
+        fetchLinks(false); // Refresh links when new clicks occur
+      })
+      .subscribe();
+    console.log('🔗✅ useLinks: Links subscription established');
+    
+    return () => {
+      supabase.removeChannel(linksSubscription);
+    };
   }, []);
 
   return {

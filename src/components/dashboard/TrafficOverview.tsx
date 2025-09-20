@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 const TrafficOverview = () => {
-  const [startDate, setStartDate] = useState<Date>(new Date(2025, 8, 1)); // September 1, 2025
-  const [endDate, setEndDate] = useState<Date>(new Date(2025, 8, 30)); // September 30, 2025
+  // Set to current month for real data
+  const now = new Date();
+  const [startDate, setStartDate] = useState<Date>(new Date(now.getFullYear(), now.getMonth(), 1));
+  const [endDate, setEndDate] = useState<Date>(new Date(now.getFullYear(), now.getMonth() + 1, 0));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const { analytics, loading } = useAnalytics(startDate, endDate);
@@ -20,6 +22,7 @@ const TrafficOverview = () => {
   };
 
   const maxClicks = Math.max(...(analytics.chartData || []).map(d => d.clicks), 1);
+  
   // Create Y-axis labels with proper increments (0, 10, 20, 30, etc.)
   const getYAxisLabels = (max: number) => {
     if (max <= 10) {
@@ -177,6 +180,7 @@ const TrafficOverview = () => {
               {(analytics.chartData || []).map((data, index) => {
                 const maxYAxis = Math.max(...yAxisLabels);
                 const height = (data.clicks / maxYAxis) * 100;
+                
                 return (
                   <div key={index} className="flex-1 flex flex-col items-center group relative">
                     <div 

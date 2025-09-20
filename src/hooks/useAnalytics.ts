@@ -64,61 +64,62 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
 
       console.log('Fetching analytics for user:', user.id);
 
-      // Get total clicks (all time) for user's links
+      // Get total clicks (all time) for user's links from actual clicks table
       const { data: totalClicksData, error: totalError } = await supabase
-        .from('analytics_daily')
+        .from('clicks')
         .select(`
-          total_clicks,
+          id,
           links!inner(
             user_id
           )
         `)
-        .eq('links.user_id', user.id)
-        .gte('date', '2020-01-01');
+        .eq('links.user_id', user.id);
 
       if (totalError) throw totalError;
 
-      const totalClicks = totalClicksData?.reduce((sum, day) => sum + (day.total_clicks || 0), 0) || 0;
+      const totalClicks = totalClicksData?.length || 0;
 
-      // Get current period clicks for user's links
+      // Get current period clicks for user's links from actual clicks table
       const { data: periodClicksData, error: periodError } = await supabase
-        .from('analytics_daily')
+        .from('clicks')
         .select(`
-          total_clicks,
+          id,
+          clicked_at,
           links!inner(
             user_id
           )
         `)
         .eq('links.user_id', user.id)
-        .gte('date', periodStart)
-        .lte('date', periodEnd);
+        .gte('clicked_at', `${periodStart}T00:00:00.000Z`)
+        .lte('clicked_at', `${periodEnd}T23:59:59.999Z`);
 
       if (periodError) throw periodError;
 
-      const currentPeriodClicks = periodClicksData?.reduce((sum, day) => sum + (day.total_clicks || 0), 0) || 0;
+      const currentPeriodClicks = periodClicksData?.length || 0;
 
-      // Get today's clicks for user's links
+      // Get today's clicks for user's links from actual clicks table
       const { data: todayClicksData, error: todayError } = await supabase
-        .from('analytics_daily')
+        .from('clicks')
         .select(`
-          total_clicks,
+          id,
+          clicked_at,
           links!inner(
             user_id
           )
         `)
         .eq('links.user_id', user.id)
-        .eq('date', today);
+        .gte('clicked_at', `${today}T00:00:00.000Z`)
+        .lte('clicked_at', `${today}T23:59:59.999Z`);
 
       if (todayError) throw todayError;
 
-      const todayClicks = todayClicksData?.reduce((sum, day) => sum + (day.total_clicks || 0), 0) || 0;
+      const todayClicks = todayClicksData?.length || 0;
 
-      // Get chart data for the selected period for user's links with URL breakdown
+      // Get chart data for the selected period for user's links with URL breakdown from actual clicks table
       const { data: chartData, error: chartError } = await supabase
-        .from('analytics_daily')
+        .from('clicks')
         .select(`
-          date, 
-          total_clicks,
+          clicked_at,
           links!inner(
             user_id,
             short_code,
@@ -126,22 +127,42 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
           )
         `)
         .eq('links.user_id', user.id)
-        .gte('date', periodStart)
-        .lte('date', periodEnd)
-        .order('date', { ascending: true });
+        .gte('clicked_at', `${periodStart}T00:00:00.000Z`)
+        .lte('clicked_at', `${periodEnd}T23:59:59.999Z`)
+        .order('clicked_at', { ascending: true });
 
       if (chartError) throw chartError;
 
-      // Process chart data with URL breakdown
-      const processedChartData = chartData?.map(day => ({
-        date: day.date,
-        clicks: day.total_clicks || 0,
-        urlBreakdown: {
-          shortCode: day.links?.short_code,
-          originalUrl: day.links?.original_url,
-          clicks: day.total_clicks || 0
+      // Process chart data with URL breakdown from actual clicks
+      const processedChartData = chartData?.reduce((acc, click) => {
+        const date = click.clicked_at.split('T')[0];
+        const existingDay = acc.find(d => d.date === date);
+        
+        if (existingDay) {
+          existingDay.clicks += 1;
+          // Update URL breakdown for the most recent click (or you could accumulate multiple URLs)
+          existingDay.urlBreakdown = {
+            shortCode: click.links?.short_code,
+            originalUrl: click.links?.original_url,
+            clicks: existingDay.clicks
+          };
+        } else {
+          acc.push({
+            date: date,
+            clicks: 1,
+            urlBreakdown: {
+              shortCode: click.links?.short_code,
+              originalUrl: click.links?.original_url,
+              clicks: 1
+            }
+          });
         }
-      })) || [];
+        
+        return acc;
+      }, [] as any[]) || [];
+
+      // Sort chart data by date to ensure proper display order
+      processedChartData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       console.log('📊 Analytics Chart Data:', {
         rawData: chartData,
@@ -190,41 +211,23 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
 
       if (error) throw error;
 
-      // Process recent activity with today/yesterday counts
-      const processedActivity = await Promise.all(
-        clicksData?.map(async (click) => {
-          // Get today's clicks for this link
-          const { data: todayData } = await supabase
-            .from('analytics_daily')
-            .select('total_clicks')
-            .eq('link_id', click.link_id)
-            .eq('date', today)
-            .single();
-
-          // Get yesterday's clicks for this link
-          const { data: yesterdayData } = await supabase
-            .from('analytics_daily')
-            .select('total_clicks')
-            .eq('link_id', click.link_id)
-            .eq('date', yesterday)
-            .single();
-
-          return {
-            id: click.id,
-            original_url: click.links.original_url,
-            short_url: click.links.short_url,
-            city: click.city || 'Unknown',
-            country: click.country || 'US',
-            country_name: click.country_name || 'United States',
-            device_type: click.device_type || 'unknown',
-            browser_type: click.browser_type || 'other',
-            os_type: click.os_type || 'other',
-            clicked_at: click.clicked_at,
-            todayClicks: todayData?.total_clicks || 0,
-            yesterdayClicks: yesterdayData?.total_clicks || 0
-          };
-        }) || []
-      );
+      // Process recent activity without individual queries
+      const processedActivity = clicksData?.map((click) => {
+        return {
+          id: click.id,
+          original_url: click.links.original_url,
+          short_url: click.links.short_url,
+          city: click.city || 'Unknown',
+          country: click.country || 'US',
+          country_name: click.country_name || 'United States',
+          device_type: click.device_type || 'unknown',
+          browser_type: click.browser_type || 'other',
+          os_type: click.os_type || 'other',
+          clicked_at: click.clicked_at,
+          todayClicks: 0, // Will be updated by real-time subscriptions
+          yesterdayClicks: 0 // Will be updated by real-time subscriptions
+        };
+      }) || [];
 
       setRecentActivity(processedActivity);
 
@@ -242,35 +245,22 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
     fetchAnalytics();
     fetchRecentActivity();
 
-    // Set up real-time subscriptions for analytics updates
+    // Set up real-time subscription for analytics updates
     const analyticsSubscription = supabase
       .channel('analytics-realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'analytics_daily'
-      }, (payload) => {
-        console.log('📊 Real-time analytics update:', payload);
-        fetchAnalytics(); // Refresh analytics when daily data changes
-      })
-      .subscribe();
-
-    // Set up real-time subscription for recent activity
-    const activitySubscription = supabase
-      .channel('activity-realtime')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'clicks'
       }, (payload) => {
-        console.log('🔥 Real-time click detected:', payload);
-        fetchRecentActivity(); // Refresh recent activity when new click is added
+        console.log('📊 Real-time analytics update:', payload);
+        fetchAnalytics(); // Refresh analytics when new click is added
+        fetchRecentActivity(); // Also refresh recent activity
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(analyticsSubscription);
-      supabase.removeChannel(activitySubscription);
     };
   }, [startDate, endDate]);
 
