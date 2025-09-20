@@ -195,11 +195,28 @@ const WorldMap = ({ linkId, recentActivity, onCountrySelect }: WorldMapProps) =>
       try {
         setLoading(true);
         
-        // Fetch clicks data for this link
-        const { data: clicksData, error } = await supabase
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch clicks data for this link or all user's links
+        let query = supabase
           .from('clicks')
-          .select('country, city, country_name')
-          .eq('link_id', linkId);
+          .select(`
+            country, 
+            city, 
+            country_name,
+            links!inner(
+              user_id
+            )
+          `)
+          .eq('links.user_id', user.id);
+
+        if (linkId) {
+          query = query.eq('link_id', linkId);
+        }
+
+        const { data: clicksData, error } = await query;
 
         if (error) throw error;
 
@@ -306,7 +323,7 @@ const WorldMap = ({ linkId, recentActivity, onCountrySelect }: WorldMapProps) =>
     };
 
     fetchData();
-  }, [linkId]);
+  }, [linkId, recentActivity]);
 
   const handleCountryClick = (country: string) => {
     console.log('Country clicked:', country);

@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import WorldMap from '@/components/analytics/WorldMap';
 import ViewAllActivityModal from '@/components/analytics/ViewAllActivityModal';
 import PlatformsAnalytics from '@/components/analytics/PlatformsAnalytics';
+import BrowserAnalytics from '@/components/analytics/BrowserAnalytics';
 
 const Statistics = () => {
   const { linkId } = useParams<{ linkId: string }>();
@@ -86,9 +87,27 @@ const Statistics = () => {
 
         if (clicksError) throw clicksError;
 
-        // Calculate summary metrics
-        let totalClicks = dailyData?.reduce((sum, day) => sum + (day.total_clicks || 0), 0) || 0;
-        let uniqueClicks = dailyData?.reduce((sum, day) => sum + (day.unique_clicks || 0), 0) || 0;
+        // Calculate summary metrics from actual clicks table (not analytics_daily)
+        const { data: allClicksData, error: allClicksError } = await supabase
+          .from('clicks')
+          .select('id, ip_address, created_at')
+          .eq('link_id', selectedLink.id);
+
+        if (allClicksError) throw allClicksError;
+
+        // Calculate total clicks from actual clicks table
+        let totalClicks = allClicksData?.length || 0;
+        
+        // Calculate unique clicks based on IP address
+        const uniqueIPs = new Set(allClicksData?.map(click => click.ip_address).filter(Boolean) || []);
+        let uniqueClicks = uniqueIPs.size;
+
+        console.log('Statistics - Click counts from actual clicks table:', {
+          totalClicks,
+          uniqueClicks,
+          allClicksCount: allClicksData?.length || 0,
+          uniqueIPsCount: uniqueIPs.size
+        });
         
         // Get top country and referrer from recent clicks
         const countryCounts: { [key: string]: number } = {};
@@ -110,28 +129,31 @@ const Statistics = () => {
           referrerCounts[a] > referrerCounts[b] ? a : b, 'Direct'
         );
 
-        let chartData = dailyData?.map(day => ({
-          date: day.date,
-          clicks: day.total_clicks || 0,
-          unique: day.unique_clicks || 0
-        })) || [];
-
-        // If no daily data, create some mock data for the last 10 days
-        if (chartData.length === 0) {
-          console.log('No daily analytics data found, creating mock data');
-          chartData = Array.from({ length: 10 }, (_, i) => {
-            const date = subDays(new Date(), 9 - i);
-            return {
-              date: format(date, 'yyyy-MM-dd'),
-              clicks: Math.floor(Math.random() * 5), // Random clicks 0-4
-              unique: Math.floor(Math.random() * 3) // Random unique 0-2
-            };
-          });
+        // Create chart data from actual clicks (last 10 days)
+        const chartData = Array.from({ length: 10 }, (_, i) => {
+          const date = subDays(new Date(), 9 - i);
+          const dateStr = format(date, 'yyyy-MM-dd');
           
-          // Update totals with mock data
-          totalClicks = chartData.reduce((sum, day) => sum + day.clicks, 0);
-          uniqueClicks = chartData.reduce((sum, day) => sum + day.unique, 0);
-        }
+          // Count clicks for this specific date
+          const dayClicks = allClicksData?.filter(click => 
+            click.created_at.startsWith(dateStr)
+          ) || [];
+          
+          // Count unique clicks for this date
+          const dayUniqueIPs = new Set(dayClicks.map(click => click.ip_address).filter(Boolean));
+          
+          return {
+            date: dateStr,
+            clicks: dayClicks.length,
+            unique: dayUniqueIPs.size
+          };
+        });
+
+        console.log('Statistics - Chart data from actual clicks:', {
+          chartData,
+          totalClicks,
+          uniqueClicks
+        });
 
         console.log('Analytics Data:', {
           totalClicks,
@@ -320,13 +342,13 @@ const Statistics = () => {
 
         {/* Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="summary">Summary</TabsTrigger>
             <TabsTrigger value="countries">Countries & Cities</TabsTrigger>
             <TabsTrigger value="platforms">Platforms</TabsTrigger>
             <TabsTrigger value="browsers">Browsers</TabsTrigger>
-            <TabsTrigger value="languages">Languages</TabsTrigger>
-            <TabsTrigger value="referrers">Referrers</TabsTrigger>
+            {/* <TabsTrigger value="languages">Languages</TabsTrigger>
+            <TabsTrigger value="referrers">Referrers</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="summary" className="space-y-6">
@@ -479,16 +501,20 @@ const Statistics = () => {
           </TabsContent>
 
           <TabsContent value="browsers" className="space-y-6">
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Browsers</h2>
-              <div className="text-center py-8 text-muted-foreground">
-                <Chrome className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>Browser data coming soon</p>
-              </div>
-            </Card>
+            {linkId ? (
+              <BrowserAnalytics linkId={linkId} />
+            ) : (
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Browsers</h2>
+                <div className="text-center py-8 text-muted-foreground">
+                  <Chrome className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No link ID available</p>
+                </div>
+              </Card>
+            )}
           </TabsContent>
 
-          <TabsContent value="languages" className="space-y-6">
+          {/* <TabsContent value="languages" className="space-y-6">
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-4">Languages</h2>
               <div className="text-center py-8 text-muted-foreground">
@@ -506,7 +532,7 @@ const Statistics = () => {
                 <p>Referrer data coming soon</p>
               </div>
             </Card>
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
       </div>
 

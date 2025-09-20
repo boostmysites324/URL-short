@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import AuthPage from "./components/auth/AuthPage";
 import Redirect from "./pages/Redirect";
 import Statistics from "./pages/Statistics";
+import GlobalStatistics from "./pages/GlobalStatistics";
 import Archives from "./pages/Archives";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const AppRoutes = () => {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/s/:shortCode" element={<Redirect />} />
         <Route path="/statistics/:linkId" element={<Statistics />} />
+        <Route path="/statistics" element={<GlobalStatistics />} />
         <Route path="/archives" element={<Archives />} />
         <Route 
           path="/" 

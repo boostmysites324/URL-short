@@ -82,18 +82,28 @@ const PlatformsAnalytics = ({ linkId }: PlatformsAnalyticsProps) => {
   };
 
   const fetchPlatformData = async () => {
-    if (!linkId) {
-      console.log('PlatformsAnalytics - No linkId provided');
-      return;
-    }
-    
     console.log('PlatformsAnalytics - Fetching data for linkId:', linkId);
     setLoading(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       let query = supabase
         .from('clicks')
-        .select('os, device_type')
-        .eq('link_id', linkId);
+        .select(`
+          os, 
+          device_type,
+          links!inner(
+            user_id
+          )
+        `)
+        .eq('links.user_id', user.id);
+
+      // Filter by specific link if linkId provided
+      if (linkId) {
+        query = query.eq('link_id', linkId);
+      }
 
       // Apply date filter
       if (dateRange.from) {

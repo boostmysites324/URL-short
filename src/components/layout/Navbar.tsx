@@ -1,4 +1,4 @@
-import { Link, Command, User, Moon, Sun, Archive } from "lucide-react";
+import { Link, Command, User, Moon, Sun, Archive, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -67,6 +67,15 @@ const Navbar = () => {
               <kbd className="pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded-md border border-border bg-muted px-2 font-mono text-[11px] font-medium text-muted-foreground shadow-sm">
                 CTRL + K
               </kbd>
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/statistics')}
+              className="flex items-center space-x-2 text-muted-foreground hover:text-card-foreground hover:bg-surface-secondary/80 transition-all duration-300 rounded-lg px-4 py-2 group"
+            >
+              <BarChart3 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="font-medium">Statistics</span>
             </Button>
             
             <Button 

@@ -35,10 +35,16 @@ interface ActivityItem {
   country_name: string;
   city: string;
   device_type: string;
-  browser: string;
-  os: string;
+  browser_type: string;
+  browser_version: string;
+  os_type: string;
+  os_version: string;
   referer: string;
   created_at: string;
+  links?: {
+    short_code: string;
+    original_url: string;
+  };
 }
 
 interface ViewAllActivityModalProps {
@@ -71,15 +77,50 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
   const [uniqueDevices, setUniqueDevices] = useState<string[]>([]);
 
   const fetchActivities = async (page: number = 1) => {
-    if (!linkId) return;
-    
     setLoading(true);
     try {
-      let query = supabase
-        .from('clicks')
-        .select('*', { count: 'exact' })
-        .eq('link_id', linkId)
-        .order('created_at', { ascending: false });
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('ViewAllActivityModal - No user found');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('ViewAllActivityModal - Starting fetch for user:', user.id);
+      
+      let query;
+      
+      if (linkId) {
+        // For individual link, use the complex query with joins
+        query = supabase
+          .from('clicks')
+          .select(`
+            *,
+            links!inner(
+              user_id,
+              short_code,
+              original_url
+            )
+          `, { count: 'exact' })
+          .eq('links.user_id', user.id)
+          .eq('link_id', linkId)
+          .order('created_at', { ascending: false });
+      } else {
+        // For global statistics, use the same approach as individual links but without linkId filter
+        query = supabase
+          .from('clicks')
+          .select(`
+            *,
+            links!inner(
+              user_id,
+              short_code,
+              original_url
+            )
+          `, { count: 'exact' })
+          .eq('links.user_id', user.id)
+          .order('created_at', { ascending: false });
+      }
 
       // Apply filters
       if (countryFilter !== 'all') {
@@ -104,40 +145,101 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
       const to = from + itemsPerPage - 1;
       query = query.range(from, to);
 
+      console.log('ViewAllActivityModal - Executing query with pagination:', {
+        from,
+        to,
+        linkId,
+        page
+      });
+
       const { data, error, count } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('ViewAllActivityModal - Error fetching activities:', error);
+        throw error;
+      }
 
+      console.log('ViewAllActivityModal - Fetched activities:', {
+        data,
+        count,
+        linkId,
+        page,
+        totalPages: Math.ceil((count || 0) / itemsPerPage)
+      });
+
+      // Data is already enriched with links relation, so use it directly
       setActivities(data || []);
+      
       setTotalCount(count || 0);
       setTotalPages(Math.ceil((count || 0) / itemsPerPage));
       
       // Update unique values for filters
       if (page === 1) {
-        const { data: allData } = await supabase
-          .from('clicks')
-          .select('country, country_name, device_type')
-          .eq('link_id', linkId);
+        let filterQuery;
+        
+        if (linkId) {
+          filterQuery = supabase
+            .from('clicks')
+            .select('country, country_name, device_type')
+            .eq('link_id', linkId);
+        } else {
+          // For global statistics, use the same approach as individual links
+          filterQuery = supabase
+            .from('clicks')
+            .select(`
+              country, 
+              country_name, 
+              device_type,
+              links!inner(
+                user_id
+              )
+            `)
+            .eq('links.user_id', user.id);
+        }
+
+        const { data: allData, error: filterError } = await filterQuery;
+        
+        if (filterError) {
+          console.error('ViewAllActivityModal - Error fetching filter data:', filterError);
+        }
+        
+        console.log('ViewAllActivityModal - Filter data:', {
+          allData,
+          linkId,
+          user: user?.id
+        });
         
         if (allData) {
           // Use country_name if available, otherwise fall back to country
-          const countries = [...new Set(allData.map(item => item.country_name || item.country).filter(Boolean))];
-          const devices = [...new Set(allData.map(item => item.device_type).filter(Boolean))];
+          const countries = [...new Set(allData.map(item => item.country_name || item.country).filter(Boolean))] as string[];
+          const devices = [...new Set(allData.map(item => item.device_type).filter(Boolean))] as string[];
           setUniqueCountries(countries);
           setUniqueDevices(devices);
         }
       }
     } catch (error) {
-      console.error('Error fetching activities:', error);
+      console.error('ViewAllActivityModal - Error fetching activities:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isOpen && linkId) {
-      fetchActivities(1);
-      setCurrentPage(1);
+    console.log('ViewAllActivityModal - useEffect triggered:', {
+      isOpen,
+      linkId,
+      countryFilter,
+      deviceFilter,
+      dateRange
+    });
+    
+    if (isOpen) {
+      console.log('ViewAllActivityModal - Opening modal, fetching activities...');
+      // Add a small delay to ensure modal is fully open
+      setTimeout(() => {
+        fetchActivities(1);
+        setCurrentPage(1);
+      }, 100);
     }
   }, [isOpen, linkId, countryFilter, deviceFilter, dateRange]);
 
@@ -174,7 +276,20 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
   };
 
   const getBrowserIcon = (browser: string) => {
-    return <Chrome className="w-4 h-4" />; // Default to Chrome icon
+    switch (browser?.toLowerCase()) {
+      case 'chrome':
+        return <Chrome className="w-4 h-4" />;
+      case 'firefox':
+        return <Globe className="w-4 h-4" />;
+      case 'safari':
+        return <Globe className="w-4 h-4" />;
+      case 'edge':
+        return <Globe className="w-4 h-4" />;
+      case 'opera':
+        return <Globe className="w-4 h-4" />;
+      default:
+        return <Globe className="w-4 h-4" />;
+    }
   };
 
   const getCountryFlag = (country: string) => {
@@ -204,7 +319,7 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
             </Button>
           </DialogTitle>
           <DialogDescription>
-            View and filter all click activity for this shortened URL
+            {linkId ? 'View and filter all click activity for this shortened URL' : 'View and filter all click activity from all your links'}
           </DialogDescription>
         </DialogHeader>
 
@@ -349,6 +464,11 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
                           {activity.country_name || activity.country}
                         </span>
                       </div>
+                      {activity.links && (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="font-mono">{activity.links.original_url}</span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
@@ -358,8 +478,8 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
                       </div>
                       
                       <div className="flex items-center space-x-1">
-                        {getBrowserIcon(activity.browser)}
-                        <span>{activity.browser}</span>
+                        {getBrowserIcon(activity.browser_type)}
+                        <span>{activity.browser_type}</span>
                       </div>
                       
                       {activity.referer && (
@@ -371,7 +491,7 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
                       
                       <div className="flex items-center space-x-1">
                         <User className="w-4 h-4" />
-                        <span>{activity.os}</span>
+                        <span>{activity.os_type}</span>
                       </div>
                       
                       <div className="flex items-center space-x-1">
