@@ -46,23 +46,24 @@ const BulkActions = ({ selectedLinks, onClearSelection, onRefresh }: BulkActions
   const { deleteLink } = useLinks();
   const { toast } = useToast();
 
-  const handleArchive = async () => {
-    try {
-      setLoading(true);
-      // Archive functionality would be implemented here
-      // For now, we'll just show a success message
-      toast({
-        title: "Links archived",
-        description: `${selectedLinks.length} links have been archived`,
-      });
-      onClearSelection();
-      setIsArchiveDialogOpen(false);
-    } catch (error) {
-      console.error('Error archiving links:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // COMMENTED OUT FOR NOW - ARCHIVE NOT NEEDED
+  // const handleArchive = async () => {
+  //   try {
+  //     setLoading(true);
+  //     // Archive functionality would be implemented here
+  //     // For now, we'll just show a success message
+  //     toast({
+  //       title: "Links archived",
+  //       description: `${selectedLinks.length} links have been archived`,
+  //     });
+  //     onClearSelection();
+  //     setIsArchiveDialogOpen(false);
+  //   } catch (error) {
+  //     console.error('Error archiving links:', error);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleAssignChannel = async () => {
     if (!selectedChannel) return;
@@ -83,43 +84,44 @@ const BulkActions = ({ selectedLinks, onClearSelection, onRefresh }: BulkActions
     }
   };
 
-  const handleAssignCampaign = async () => {
-    if (!selectedCampaign) return;
+  // COMMENTED OUT FOR NOW - CAMPAIGNS AND PIXELS NOT NEEDED
+  // const handleAssignCampaign = async () => {
+  //   if (!selectedCampaign) return;
 
-    try {
-      setLoading(true);
-      // Campaign assignment would be implemented here
-      toast({
-        title: "Campaign assigned",
-        description: `${selectedLinks.length} links assigned to campaign`,
-      });
-      onClearSelection();
-      setIsCampaignDialogOpen(false);
-    } catch (error) {
-      console.error('Error assigning campaign:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  //   try {
+  //     setLoading(true);
+  //     // Campaign assignment would be implemented here
+  //     toast({
+  //       title: "Campaign assigned",
+  //       description: `${selectedLinks.length} links assigned to campaign`,
+  //     });
+  //     onClearSelection();
+  //     setIsCampaignDialogOpen(false);
+  //   } catch (error) {
+  //     console.error('Error assigning campaign:', error);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
-  const handleAssignPixels = async () => {
-    if (selectedPixels.length === 0) return;
+  // const handleAssignPixels = async () => {
+  //   if (selectedPixels.length === 0) return;
 
-    try {
-      setLoading(true);
-      // Pixel assignment would be implemented here
-      toast({
-        title: "Pixels assigned",
-        description: `${selectedLinks.length} links assigned pixels`,
-      });
-      onClearSelection();
-      setIsPixelDialogOpen(false);
-    } catch (error) {
-      console.error('Error assigning pixels:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  //   try {
+  //     setLoading(true);
+  //     // Pixel assignment would be implemented here
+  //     toast({
+  //       title: "Pixels assigned",
+  //       description: `${selectedLinks.length} links assigned pixels`,
+  //     });
+  //     onClearSelection();
+  //     setIsPixelDialogOpen(false);
+  //   } catch (error) {
+  //     console.error('Error assigning pixels:', error);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleExport = async () => {
     try {
@@ -249,8 +251,9 @@ const BulkActions = ({ selectedLinks, onClearSelection, onRefresh }: BulkActions
           </DialogContent>
         </Dialog>
 
+        {/* COMMENTED OUT - CAMPAIGNS AND PIXELS NOT NEEDED FOR NOW */}
         {/* Add to Campaign */}
-        <Dialog open={isCampaignDialogOpen} onOpenChange={setIsCampaignDialogOpen}>
+        {/* <Dialog open={isCampaignDialogOpen} onOpenChange={setIsCampaignDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Megaphone className="w-4 h-4 mr-1" />
@@ -294,10 +297,10 @@ const BulkActions = ({ selectedLinks, onClearSelection, onRefresh }: BulkActions
               </div>
             </div>
           </DialogContent>
-        </Dialog>
+        </Dialog> */}
 
         {/* Add Pixels */}
-        <Dialog open={isPixelDialogOpen} onOpenChange={setIsPixelDialogOpen}>
+        {/* <Dialog open={isPixelDialogOpen} onOpenChange={setIsPixelDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Square className="w-4 h-4 mr-1" />
@@ -341,7 +344,7 @@ const BulkActions = ({ selectedLinks, onClearSelection, onRefresh }: BulkActions
               </div>
             </div>
           </DialogContent>
-        </Dialog>
+        </Dialog> */}
 
         {/* Export */}
         <Button variant="outline" size="sm" onClick={handleExport}>

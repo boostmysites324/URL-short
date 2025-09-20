@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe, Share, BarChart3, Edit, Archive, Eye, QrCode, Download, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useLinks } from "@/hooks/useLinks";
@@ -43,6 +44,13 @@ const LinkShortener = () => {
   });
   const [showShortLinkModal, setShowShortLinkModal] = useState(false);
   const [newShortLink, setNewShortLink] = useState<{
+    shortUrl: string;
+    originalUrl: string;
+    linkId: string;
+    createdAt: string;
+  } | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareLink, setShareLink] = useState<{
     shortUrl: string;
     originalUrl: string;
     linkId: string;
@@ -311,6 +319,16 @@ const LinkShortener = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleShareClick = (link: any) => {
+    setShareLink({
+      shortUrl: link.short_url,
+      originalUrl: link.original_url,
+      linkId: link.id,
+      createdAt: link.created_at
+    });
+    setShowShareModal(true);
   };
 
   const toggleLinkSelection = (linkId: string) => {
@@ -730,24 +748,75 @@ const LinkShortener = () => {
                           </div>
                         </div>
                         
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyToClipboard(link.short_url, link.id)}
-                          className="flex items-center space-x-2 hover-lift hover:border-primary group-hover:shadow-md transition-all duration-300"
-                        >
-                          {copiedId === link.id ? (
-                            <>
-                              <Check className="w-4 h-4 text-success" />
-                              <span className="font-medium text-success">Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-4 h-4" />
-                              <span className="font-medium">Copy</span>
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(link.short_url, link.id)}
+                            className="flex items-center space-x-2 hover-lift hover:border-primary group-hover:shadow-md transition-all duration-300"
+                          >
+                            {copiedId === link.id ? (
+                              <>
+                                <Check className="w-4 h-4 text-success" />
+                                <span className="font-medium text-success">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-4 h-4" />
+                                <span className="font-medium">Copy</span>
+                              </>
+                            )}
+                          </Button>
+                          
+                          {/* 3-Dot Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => handleShareClick(link)}>
+                                <Share className="w-4 h-4 mr-2" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <BarChart3 className="w-4 h-4 mr-2" />
+                                Statistics
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Archive className="w-4 h-4 mr-2" />
+                                Archive
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Set Public
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <QrCode className="w-4 h-4 mr-2" />
+                                Custom QR Code
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem>
+                                <Download className="w-4 h-4 mr-2" />
+                                Export Statistics
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <RotateCcw className="w-4 h-4 mr-2" />
+                                Reset Stats
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-red-600 focus:text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -776,6 +845,21 @@ const LinkShortener = () => {
           originalUrl={newShortLink.originalUrl}
           linkId={newShortLink.linkId}
           createdAt={newShortLink.createdAt}
+        />
+      )}
+
+      {/* Share Modal */}
+      {shareLink && (
+        <ShortLinkModal
+          isOpen={showShareModal}
+          onClose={() => {
+            setShowShareModal(false);
+            setShareLink(null);
+          }}
+          shortUrl={shareLink.shortUrl}
+          originalUrl={shareLink.originalUrl}
+          linkId={shareLink.linkId}
+          createdAt={shareLink.createdAt}
         />
       )}
     </div>
