@@ -26,6 +26,7 @@ const RecentActivitySidebar = () => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetch, setLastFetch] = useState(0);
+  const [statsByLink, setStatsByLink] = useState<Record<string, { unique: number; yesterday: number; today: number }>>({});
 
   useEffect(() => {
     fetchRecentActivity();
@@ -178,10 +179,48 @@ const RecentActivitySidebar = () => {
       console.log('Transformed activities:', transformedActivities);
 
       setActivities(transformedActivities);
+
+      // Compute per-link stats for the UI (unique, yesterday, today)
+      const linkIdsForStats = Array.from(new Set(transformedActivities.map(a => a.link_id)));
+      await computeStatsForLinks(linkIdsForStats);
     } catch (error) {
       console.error('Error fetching recent activity:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const computeStatsForLinks = async (linkIds: string[]) => {
+    try {
+      if (linkIds.length === 0) return;
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const yest = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      const yestStr = yest.toISOString().split('T')[0];
+
+      // Fetch last 30 days of clicks for these links and aggregate client-side
+      const since = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: clicksRange, error } = await supabase
+        .from('clicks')
+        .select('link_id, ip_address, created_at')
+        .in('link_id', linkIds)
+        .gte('created_at', since);
+      if (error) {
+        console.error('Error fetching stats range:', error);
+        return;
+      }
+
+      const nextStats: Record<string, { unique: number; yesterday: number; today: number }> = {};
+      for (const linkId of linkIds) {
+        const rows = (clicksRange || []).filter(r => r.link_id === linkId);
+        const uniqueIPs = new Set(rows.map(r => r.ip_address).filter(Boolean));
+        const yCount = rows.filter(r => r.created_at?.startsWith(yestStr)).length;
+        const tCount = rows.filter(r => r.created_at?.startsWith(todayStr)).length;
+        nextStats[linkId] = { unique: uniqueIPs.size, yesterday: yCount, today: tCount };
+      }
+      setStatsByLink(nextStats);
+    } catch (e) {
+      console.error('Failed computing per-link stats:', e);
     }
   };
 
@@ -296,50 +335,49 @@ const RecentActivitySidebar = () => {
           </div>
         ) : (
           <div className="space-y-3 flex-1 overflow-y-auto">
-            {activities.map((activity) => (
-              <div key={activity.id} className="bg-surface-secondary rounded-lg p-3 hover:bg-surface-secondary/80 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-2">
-                    <div className="flex items-center justify-center w-6 h-6 bg-primary/10 rounded">
-                      {getDeviceIcon(activity.device_type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-1 mb-1">
-                        <span className="text-xs font-medium text-card-foreground truncate">
-                          {activity.city}, {activity.country}
-                        </span>
-                        <Badge variant="outline" className="text-xs px-1 py-0">
-                          {activity.device_type}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <Badge className={`text-xs px-1 py-0 ${getBrowserColor(activity.browser)}`}>
-                          {activity.browser}
-                        </Badge>
+            {activities.map((activity) => {
+              const stats = statsByLink[activity.link_id];
+              const shortDisplay = activity.short_url?.replace('https://', '').replace('http://', '') || 'Link';
+              return (
+                <div key={activity.id} className="bg-white rounded-lg p-3 border border-card-border hover:shadow-sm transition-shadow">
+                  {/* Top row: short link and time */}
+                  <div className="flex items-center justify-between mb-1">
+                    <a href={activity.short_url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline truncate">
+                      {shortDisplay}
+                    </a>
+                    <span className="text-xs text-muted-foreground">{formatTimeAgo(activity.created_at)}</span>
+                  </div>
+
+                  {/* Middle row: location, device, browser, referrer */}
+                  <div className="flex items-center flex-wrap gap-2 text-xs text-muted-foreground">
+                    <span>{activity.city}, {activity.country}</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">{getDeviceIcon(activity.device_type)} {activity.device_type}</span>
+                    <span>•</span>
+                    <Badge className={`px-1.5 py-0 ${getBrowserColor(activity.browser)}`}>{activity.browser}</Badge>
+                    {activity.referrer && (
+                      <>
                         <span>•</span>
-                        <span>{formatTimeAgo(activity.created_at)}</span>
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground truncate">
-                        <a 
-                          href={activity.short_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          {activity.short_url?.replace('https://', '').replace('http://', '').split('/').pop() || 'Unknown'}
+                        <a href={activity.referrer} target="_blank" rel="noopener noreferrer" className="truncate max-w-[160px] text-primary hover:underline">
+                          {activity.referrer?.replace('https://', '').replace('http://', '')}
                         </a>
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground truncate">
-                        <span className="text-muted-foreground">From:</span> {activity.referrer || 'Direct'}
-                      </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Bottom stats row */}
+                  {stats && (
+                    <div className="mt-2 text-xs">
+                      <span className="text-fuchsia-600 font-medium">➜ {stats.unique} Unique Clicks</span>
+                      <span className="mx-2 text-muted-foreground">•</span>
+                      <span className="text-rose-600 font-medium">{stats.yesterday} Yesterday Clicks</span>
+                      <span className="mx-2 text-muted-foreground">•</span>
+                      <span className="text-green-600 font-medium">{stats.today} Today Clicks</span>
                     </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatTimeAgo(activity.created_at)}
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

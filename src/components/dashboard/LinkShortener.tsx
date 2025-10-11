@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,6 +41,11 @@ const LinkShortener = () => {
     customDomainUrl: "",
     expirationDate: undefined as Date | undefined,
     passwordValue: "",
+    customAlias: "",
+    description: "",
+    redirectType: "direct",
+    channelId: "",
+    campaignId: "",
     domainValidation: {
       isValid: false,
       isChecking: false,
@@ -64,7 +70,7 @@ const LinkShortener = () => {
   const [editLink, setEditLink] = useState<any>(null);
   
   const { toast } = useToast();
-  const { links, loading, shortenUrl, refreshLinks } = useLinks();
+  const { links, loading, shortenUrl, refreshLinks, page, hasMore, nextPage, prevPage } = useLinks();
   const { domains } = useDomains();
   const { channels } = useChannels();
   const { campaigns } = useCampaigns();
@@ -189,7 +195,12 @@ const LinkShortener = () => {
         customDomain: settings.customDomain && settings.domainValidation.isValid ? settings.customDomainUrl : undefined,
         analyticsEnabled: settings.analytics,
         expiresAt: settings.expiration && settings.expirationDate ? convertISTToUTC(settings.expirationDate) : undefined,
-        password: settings.password && settings.passwordValue ? settings.passwordValue : undefined
+        password: settings.password && settings.passwordValue ? settings.passwordValue : undefined,
+        customAlias: settings.customAlias || undefined,
+        description: settings.description || undefined,
+        channelId: settings.channelId || undefined,
+        campaignId: settings.campaignId || undefined,
+        redirectType: settings.redirectType || 'direct'
       };
 
       console.log('Link settings:', linkSettings);
@@ -550,14 +561,14 @@ const LinkShortener = () => {
     link.original_url.toLowerCase().includes(searchTerm.toLowerCase()) ||
     link.short_url.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase()))
-  ).slice(0, 10); // Show only last 10 links
+  ); // useLinks already limits to 30 per page
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-      {/* Main Content - 60% */}
-      <div className="lg:col-span-7 space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 xl:gap-6 animate-fade-in">
+      {/* Main Content - wider */}
+      <div className="lg:col-span-8 xl:col-span-8 space-y-6">
         {/* Enhanced Shorten Link Card */}
-        <Card className="p-8 card-gradient shadow-card border-card-border hover-glow group">
+        <Card className="p-6 lg:p-7 xl:p-8 card-gradient shadow-card border-card-border hover-glow group">
         <div className="space-y-6">
           <div className="flex items-center space-x-3">
             <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-300">
@@ -596,7 +607,92 @@ const LinkShortener = () => {
                 </Button>
               )}
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
+              {/* Customization dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="h-12 px-3 gap-2 rounded-lg hover:border-primary">
+                    <Settings className="w-4 h-4" />
+                    <span className="hidden sm:inline">Customize</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[520px] p-4 rounded-xl bg-card border border-card-border shadow-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-card-foreground">Customize</p>
+                      <p className="text-xs text-muted-foreground">Fine-tune options before shortening</p>
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Domain */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Domain</Label>
+                      <Input
+                        placeholder="https://b2u.io"
+                        value={settings.customDomainUrl}
+                        onChange={(e) => setSettings({ ...settings, customDomainUrl: e.target.value, customDomain: !!e.target.value })}
+                      />
+                      <p className="text-[10px] text-muted-foreground">Leave blank to use the default domain</p>
+                    </div>
+                    {/* Redirect */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Redirect</Label>
+                      <Select value={settings.redirectType} onValueChange={(v) => setSettings({ ...settings, redirectType: v })}>
+                        <SelectTrigger className="w-full h-9 rounded-md"><SelectValue placeholder="Direct" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="direct">Direct</SelectItem>
+                          <SelectItem value="301">301</SelectItem>
+                          <SelectItem value="302">302</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Custom alias */}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Custom</Label>
+                      <div className="relative">
+                        <Globe className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input className="pl-8 rounded-md" placeholder="Type your custom alias here" value={settings.customAlias} onChange={(e) => setSettings({ ...settings, customAlias: e.target.value })} />
+                      </div>
+                    </div>
+                    {/* Channel */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Channel</Label>
+                      <Input className="rounded-md" placeholder="Assign link to a channel" value={settings.channelId} onChange={(e) => setSettings({ ...settings, channelId: e.target.value })} />
+                    </div>
+                    {/* Password */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Password</Label>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input className="pl-8 rounded-md" type="password" placeholder="Type your password here" value={settings.passwordValue} onChange={(e) => setSettings({ ...settings, password: !!e.target.value, passwordValue: e.target.value })} />
+                      </div>
+                    </div>
+                    {/* Description */}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Description</Label>
+                      <Input className="rounded-md" placeholder="Type your description here" value={settings.description} onChange={(e) => setSettings({ ...settings, description: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setSettings({
+                        ...settings,
+                        customDomainUrl: "",
+                        customDomain: false,
+                        redirectType: "direct",
+                        customAlias: "",
+                        channelId: "",
+                        passwordValue: "",
+                        password: false,
+                        description: "",
+                      });
+                    }}>Reset</Button>
+                    <Button size="sm" onClick={() => { /* just close - values already bound */ }}>Apply</Button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button 
                 onClick={handleShorten}
                 className="h-12 px-8 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary shadow-lg hover:shadow-glow transition-all duration-300 group"
@@ -614,201 +710,34 @@ const LinkShortener = () => {
                   </>
                 )}
               </Button>
-              
-              {/* Working Settings Dialog */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="h-12 w-12 p-0 hover-lift">
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg bg-card border-card-border">
-                  <DialogHeader>
-                    <DialogTitle className="text-card-foreground">Link Settings</DialogTitle>
-                    <DialogDescription className="text-muted-foreground">
-                      Configure your link settings before shortening URLs
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-6 py-4">
-                    {/* Custom Domain */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="custom-domain" className="text-sm font-medium text-card-foreground flex items-center gap-2">
-                          <Globe className="w-4 h-4" />
-                          Use Custom Domain
-                        </Label>
-                        <Switch 
-                          id="custom-domain"
-                          checked={settings.customDomain}
-                          onCheckedChange={(checked) => setSettings({...settings, customDomain: checked})}
-                        />
-                      </div>
-                      {settings.customDomain && (
-                        <div className="space-y-2">
-                          <Input
-                            placeholder="Enter your domain (e.g., mydomain.com)"
-                            value={settings.customDomainUrl}
-                            onChange={(e) => {
-                              setSettings({...settings, customDomainUrl: e.target.value});
-                              if (e.target.value) {
-                                validateDomain(e.target.value);
-                              }
-                            }}
-                            className="w-full"
-                          />
-                          {settings.domainValidation.isChecking && (
-                            <p className="text-xs text-blue-500">Validating domain...</p>
-                          )}
-                          {settings.domainValidation.message && !settings.domainValidation.isChecking && (
-                            <p className={`text-xs ${settings.domainValidation.isValid ? 'text-green-500' : 'text-red-500'}`}>
-                              {settings.domainValidation.message}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Analytics */}
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="analytics" className="text-sm font-medium text-card-foreground flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        Enable Analytics
-                      </Label>
-                      <Switch 
-                        id="analytics"
-                        checked={settings.analytics}
-                        onCheckedChange={(checked) => setSettings({...settings, analytics: checked})}
-                      />
-                    </div>
-                    
-                    {/* Expiration */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="expiration" className="text-sm font-medium text-card-foreground flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          Set Expiration
-                        </Label>
-                        <Switch 
-                          id="expiration"
-                          checked={settings.expiration}
-                          onCheckedChange={(checked) => setSettings({...settings, expiration: checked})}
-                        />
-                      </div>
-                      {settings.expiration && (
-                        <div className="space-y-2">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !settings.expirationDate && "text-muted-foreground"
-                                )}
-                              >
-                                <Calendar className="mr-2 h-4 w-4" />
-                                {settings.expirationDate ? (
-                                  format(settings.expirationDate, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={settings.expirationDate}
-                                onSelect={(date) => setSettings({...settings, expirationDate: date})}
-                                disabled={(date) => date < new Date()}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <p className="text-xs text-muted-foreground">
-                            Expiration time will be set in IST (Indian Standard Time)
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Password Protection */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-sm font-medium text-card-foreground flex items-center gap-2">
-                          <Lock className="w-4 h-4" />
-                          Password Protection
-                        </Label>
-                        <Switch 
-                          id="password"
-                          checked={settings.password}
-                          onCheckedChange={(checked) => setSettings({...settings, password: checked})}
-                        />
-                      </div>
-                      {settings.password && (
-                        <div className="space-y-2">
-                          <Input
-                            type="password"
-                            placeholder="Enter password for this link"
-                            value={settings.passwordValue}
-                            onChange={(e) => setSettings({...settings, passwordValue: e.target.value})}
-                            className="w-full"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Users will need this password to access the shortened link
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <Button 
-                      className="w-full" 
-                      onClick={() => {
-                        toast({
-                          title: "Settings Saved",
-                          description: "Your link settings have been updated successfully.",
-                        });
-                      }}
-                    >
-                      Save Settings
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+
+              {/* Mode toggle (compact) */}
+              <div className="hidden sm:flex items-center space-x-2 ml-2">
+                <Button
+                  variant={mode === 'single' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMode('single')}
+                >
+                  Single
+                </Button>
+                <Button
+                  variant={mode === 'multiple' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMode('multiple')}
+                >
+                  Multiple
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Enhanced Mode Toggle */}
-          <div className="flex items-center space-x-1 bg-surface-secondary/50 rounded-xl p-1.5 w-fit">
-            <Button
-              variant={mode === "single" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setMode("single")}
-              className={`px-6 rounded-lg transition-all duration-300 ${
-                mode === "single" 
-                  ? "bg-gradient-to-r from-primary to-primary-dark shadow-md" 
-                  : "hover:bg-surface-secondary"
-              }`}
-            >
-              Single
-            </Button>
-            <Button
-              variant={mode === "multiple" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setMode("multiple")}
-              className={`px-6 rounded-lg transition-all duration-300 ${
-                mode === "multiple" 
-                  ? "bg-gradient-to-r from-primary to-primary-dark shadow-md" 
-                  : "hover:bg-surface-secondary"
-              }`}
-            >
-              Multiple
-            </Button>
-          </div>
+          {/* Inline options removed in favor of dropdown customization */}
         </div>
       </Card>
 
       {/* Enhanced Recent Links */}
       <Card className="card-gradient shadow-card border-card-border hover-glow animate-slide-up">
-        <div className="p-6 border-b border-card-border">
+        <div className="p-5 lg:p-6 border-b border-card-border">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xl font-bold text-card-foreground">Recent Links</h3>
@@ -1019,14 +948,26 @@ const LinkShortener = () => {
                   </div>
                 </div>
               ))}
+              {/* Pagination */}
+              <div className="p-4 flex items-center justify-between">
+                <div className="text-xs text-muted-foreground">Page {page}</div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={prevPage} disabled={page === 1}>
+                    Previous
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={nextPage} disabled={!hasMore}>
+                    Next
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </div>
       </Card>
       </div>
 
-      {/* Recent Activity Sidebar - 40% */}
-      <div className="lg:col-span-5">
+      {/* Recent Activity Sidebar - narrower */}
+      <div className="lg:col-span-4 xl:col-span-4">
         <RecentActivitySidebar />
       </div>
 

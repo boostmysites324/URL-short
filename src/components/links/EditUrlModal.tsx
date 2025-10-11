@@ -252,7 +252,7 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4" />
+                <CalendarIcon className="w-4 h-4" />
                 <Label htmlFor="expiration">Set Expiration</Label>
               </div>
               <Switch

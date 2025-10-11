@@ -11,8 +11,9 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 const TrafficOverview = () => {
   // Set to current month for real data
   const now = new Date();
-  const [startDate, setStartDate] = useState<Date>(new Date(now.getFullYear(), now.getMonth(), 1));
-  const [endDate, setEndDate] = useState<Date>(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  // Default to last 15 days
+  const [startDate, setStartDate] = useState<Date>(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14));
+  const [endDate, setEndDate] = useState<Date>(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const { analytics, loading } = useAnalytics(startDate, endDate);
@@ -21,21 +22,21 @@ const TrafficOverview = () => {
     return `${format(start, "MM/dd/yyyy")} - ${format(end, "MM/dd/yyyy")}`;
   };
 
-  const maxClicks = Math.max(...(analytics.chartData || []).map(d => d.clicks), 1);
+  const maxClicks = 90;
   
-  // Create Y-axis labels with proper increments (0, 10, 20, 30, etc.)
-  const getYAxisLabels = (max: number) => {
-    if (max <= 10) {
-      return Array.from({ length: max + 1 }, (_, i) => i);
-    } else if (max <= 50) {
-      const step = Math.ceil(max / 5);
-      return Array.from({ length: 6 }, (_, i) => i * step);
-    } else {
-      const step = Math.ceil(max / 5);
-      return Array.from({ length: 6 }, (_, i) => i * step);
-    }
-  };
-  const yAxisLabels = getYAxisLabels(maxClicks);
+  // Fixed Y-axis labels 0..90
+  const yAxisLabels = Array.from({ length: 10 }, (_, i) => i * 10);
+
+  // Build exactly last 15 days with zero-filled data
+  const last15Dates = Array.from({ length: 15 }, (_, idx) => {
+    const d = new Date(endDate);
+    d.setDate(endDate.getDate() - (14 - idx));
+    return format(d, 'yyyy-MM-dd');
+  });
+  const chartData15 = last15Dates.map((dateStr) => {
+    const found = (analytics.chartData || []).find((d) => d.date === dateStr);
+    return { date: dateStr, clicks: found?.clicks || 0 };
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -175,51 +176,56 @@ const TrafficOverview = () => {
             </div>
           </div>
           
-          <div className="relative bg-surface-secondary/30 rounded-lg p-4">
-            <div className="flex items-end justify-between h-72 space-x-2">
-              {(analytics.chartData || []).map((data, index) => {
+          <div className="relative bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            
+            {/* Gridlines */}
+            <div className="absolute left-12 right-4 top-6 bottom-12 pointer-events-none">
+              {yAxisLabels.slice().map((label, i) => {
                 const maxYAxis = Math.max(...yAxisLabels);
-                const height = (data.clicks / maxYAxis) * 100;
+                const top = (1 - (label / (maxYAxis || 1))) * 100;
+                return (
+                  <div
+                    key={`grid-${label}-${i}`}
+                    className="absolute left-0 right-0 border-t border-gray-200"
+                    style={{ top: `${top}%`, opacity: label === 0 ? 0 : 0.3 }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Bars */}
+            <div className="flex items-end justify-between h-72 space-x-1 pl-12 pr-4">
+              {chartData15.map((data, index) => {
+                const maxYAxis = Math.max(...yAxisLabels);
+                const height = (data.clicks / (maxYAxis || 1)) * 100;
                 
                 return (
                   <div key={index} className="flex-1 flex flex-col items-center group relative">
                     <div 
-                      className="w-full bg-gradient-to-t from-primary to-primary-light hover:from-primary-dark hover:to-primary rounded-t-lg relative cursor-pointer chart-bar shadow-md"
+                      className="w-full rounded-t-md relative cursor-pointer shadow-sm bg-gradient-to-t from-blue-400/70 to-blue-300/70 border border-blue-500 border-b-0 hover:from-blue-500/80 hover:to-blue-400/80 transition-colors duration-200"
                       style={{ 
                         height: `${height}%`,
-                        minHeight: '8px'
+                        minHeight: '6px'
                       }}
                     >
-                      {/* Enhanced Tooltip with URL Breakdown */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-card border border-card-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 animate-scale-in min-w-48">
-                        <div className="text-sm font-semibold text-card-foreground mb-2">{data.date}</div>
-                        <div className="text-sm text-primary font-medium mb-2">{data.clicks} total clicks</div>
-                        {data.urlBreakdown && (
-                          <div className="text-xs text-muted-foreground">
-                            <div className="font-medium text-card-foreground mb-1">URL Breakdown:</div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between">
-                                <span className="truncate max-w-32">{data.urlBreakdown.shortCode || 'Unknown'}</span>
-                                <span className="text-primary font-medium">{data.urlBreakdown.clicks} clicks</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-card border-r border-b border-card-border rotate-45"></div>
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-card border border-card-border text-card-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 z-20 whitespace-nowrap">
+                        <div className="font-semibold text-sm">{format(new Date(data.date), 'dd MMMM')}</div>
+                        <div className="text-muted-foreground">Clicks: <span className="font-medium text-card-foreground">{data.clicks}</span></div>
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground mt-3 font-medium group-hover:text-card-foreground transition-colors">
-                      {format(new Date(data.date), 'MMM d')}
+                    <span className="text-xs text-muted-foreground mt-2 font-medium transform -rotate-45 origin-left whitespace-nowrap">
+                      {format(new Date(data.date), 'dd MMMM')}
                     </span>
                   </div>
                 );
               })}
             </div>
-            
+
             {/* Y-axis labels */}
-            <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-muted-foreground py-4">
+            <div className="absolute left-2 top-6 bottom-12 flex flex-col justify-between text-xs text-gray-600 font-medium">
               {yAxisLabels.slice().reverse().map((label, index) => (
-                <span key={index}>{label}</span>
+                <span key={`ylabel-${label}-${index}`}>{label}</span>
               ))}
             </div>
           </div>

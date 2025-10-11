@@ -21,16 +21,27 @@ export interface LinkSettings {
   analyticsEnabled: boolean;
   expiresAt?: string;
   password?: string;
+  // new optional fields for advanced creation
+  customAlias?: string;
+  description?: string;
+  channelId?: string;
+  campaignId?: string;
+  pixelIds?: string[];
+  redirectType?: string;
 }
 
 export const useLinks = () => {
   const [links, setLinks] = useState<Link[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(30);
+  const [hasMore, setHasMore] = useState(false);
   const { toast } = useToast();
 
-  const fetchLinks = async (showLogs = false) => {
+  const fetchLinks = async (showLogs = false, pageArg?: number) => {
     try {
       setLoading(true);
+      const currentPage = pageArg ?? page;
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -45,13 +56,16 @@ export const useLinks = () => {
         console.log('Fetching links for user:', user.id);
       }
       
-      // Get links for current user only (exclude archived)
+      // Get links for current user only (exclude archived) with pagination
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
       const result = await (supabase as any)
         .from('links')
         .select('id, original_url, short_code, short_url, title, status, created_at, expires_at, analytics_enabled')
         .eq('user_id', user.id)
         .eq('is_archived', false)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
       
       const { data: linksData, error: linksError } = result;
 
@@ -95,6 +109,8 @@ export const useLinks = () => {
         console.log('Processed links:', processedLinks);
       }
       setLinks(processedLinks);
+      // Determine if more pages are available by checking if we got a full page
+      setHasMore((linksData?.length || 0) === pageSize);
       console.log('🔗✅ Links state updated with new counts');
       
       // Force a re-render to ensure UI updates
@@ -123,7 +139,13 @@ export const useLinks = () => {
           customDomain: settings.customDomain,
           expiresAt: settings.expiresAt,
           password: settings.password,
-          analyticsEnabled: settings.analyticsEnabled
+          analyticsEnabled: settings.analyticsEnabled,
+          customAlias: settings.customAlias,
+          description: settings.description,
+          channelId: settings.channelId,
+          campaignId: settings.campaignId,
+          pixelIds: settings.pixelIds,
+          redirectType: settings.redirectType
         }
       });
 
@@ -183,7 +205,7 @@ export const useLinks = () => {
 
   useEffect(() => {
     // Initial fetch only - no automatic refreshes
-    fetchLinks(true);
+    fetchLinks(true, 1);
 
     // Set up real-time subscription for link updates
     console.log('🔗🔧 useLinks: Setting up links subscription');
@@ -205,9 +227,26 @@ export const useLinks = () => {
     };
   }, []);
 
+  const nextPage = async () => {
+    const next = page + 1;
+    setPage(next);
+    await fetchLinks(false, next);
+  };
+
+  const prevPage = async () => {
+    const prev = Math.max(1, page - 1);
+    setPage(prev);
+    await fetchLinks(false, prev);
+  };
+
   return {
     links,
     loading,
+    page,
+    pageSize,
+    hasMore,
+    nextPage,
+    prevPage,
     shortenUrl,
     deleteLink,
     refreshLinks: fetchLinks

@@ -8,7 +8,7 @@ import { ArrowLeft, ExternalLink, Calendar, MapPin, Globe, Monitor, Chrome, User
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useLinks } from '@/hooks/useLinks';
 import { useToast } from '@/hooks/use-toast';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, subMonths } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import WorldMap from '@/components/analytics/WorldMap';
 import ViewAllActivityModal from '@/components/analytics/ViewAllActivityModal';
@@ -26,6 +26,7 @@ const Statistics = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('summary');
   const [showViewAllModal, setShowViewAllModal] = useState(false);
+  const [allLinkClicks, setAllLinkClicks] = useState<any[]>([]);
 
   // Statistics page loaded
 
@@ -174,6 +175,7 @@ const Statistics = () => {
         });
 
         setRecentActivity(clicksData || []);
+        setAllLinkClicks(allClicksData || []);
       } catch (error) {
         console.error('Error fetching link analytics:', error);
         toast({
@@ -243,10 +245,18 @@ const Statistics = () => {
     );
   }
 
-  const maxClicks = Math.max(...linkAnalytics.chartData.map(d => d.clicks), 1);
-  const yAxisLabels = maxClicks <= 5 
-    ? Array.from({ length: maxClicks + 1 }, (_, i) => i)
-    : Array.from({ length: Math.ceil(maxClicks / 10) + 1 }, (_, i) => i * 10);
+  // Build last 12 months chart data from all clicks
+  const last12Months = Array.from({ length: 12 }, (_, i) => {
+    const d = subMonths(new Date(), 11 - i);
+    return { key: format(d, 'yyyy-MM'), label: format(d, 'LLLL') };
+  });
+  const monthlyChartData = last12Months.map((m) => {
+    const count = allLinkClicks.filter((c: any) => (c.created_at || '').startsWith(m.key)).length;
+    return { date: m.label, clicks: count };
+  });
+  const maxClicks = Math.max(...monthlyChartData.map(d => d.clicks), 0);
+  const roundedMax = Math.max(200, Math.ceil(maxClicks / 200) * 200);
+  const yAxisLabels = Array.from({ length: roundedMax / 200 + 1 }, (_, i) => i * 200);
   
   // Chart data calculated
 
@@ -340,80 +350,94 @@ const Statistics = () => {
           </Card>
         </div>
 
-        {/* Navigation Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="countries">Countries & Cities</TabsTrigger>
-            <TabsTrigger value="platforms">Platforms</TabsTrigger>
-            <TabsTrigger value="browsers">Browsers</TabsTrigger>
-            {/* <TabsTrigger value="languages">Languages</TabsTrigger>
-            <TabsTrigger value="referrers">Referrers</TabsTrigger> */}
-          </TabsList>
-
-          <TabsContent value="summary" className="space-y-6">
-            {/* Clicks Section */}
-            <Card className="p-6">
+        {/* Main content grid (no tabs) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Clicks Section - Monthly chart and export */}
+            <Card className="p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-semibold">Clicks</h2>
-              <p className="text-sm text-muted-foreground">
-                {format(subDays(new Date(), 9), 'MM/dd/yyyy')} - {format(new Date(), 'MM/dd/yyyy')}
-              </p>
+              <p className="text-sm text-muted-foreground">Last 12 months</p>
             </div>
+            <Button 
+              onClick={async () => {
+                try {
+                  const { data: clicksData, error } = await supabase
+                    .from('clicks')
+                    .select('*')
+                    .eq('link_id', selectedLink.id)
+                    .order('created_at', { ascending: false });
+                  if (error) throw error;
+                  if (!clicksData || clicksData.length === 0) return;
+                  const headers = ['Date','Time','Country','City','Region','IP Address','Device Type','Browser','Operating System','User Agent','Referrer','Is Unique Click'];
+                  const rows = clicksData.map((c: any) => [
+                    new Date(c.created_at).toLocaleDateString(),
+                    new Date(c.created_at).toLocaleTimeString(),
+                    c.country_name || c.country || 'Unknown',
+                    c.city || 'Unknown',
+                    c.region || 'Unknown',
+                    c.ip_address || 'Unknown',
+                    c.device_type || 'Unknown',
+                    c.browser || 'Unknown',
+                    c.os || 'Unknown',
+                    c.user_agent || 'Unknown',
+                    c.referer || 'Direct',
+                    c.is_unique ? 'Yes' : 'No',
+                  ]);
+                  const csv = [headers.join(','), ...rows.map(r => r.map(f => `"${String(f).replace(/"/g,'""')}"`).join(','))].join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `statistics_${selectedLink.short_code}_${new Date().toISOString().slice(0,10)}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch (e) {
+                  console.error('Export error', e);
+                }
+              }}
+            >
+              Export Stats
+            </Button>
           </div>
 
-          {/* Bar Chart */}
+          {/* Monthly Bar Chart */}
           <div className="space-y-4">
-            {linkAnalytics.chartData.length > 0 ? (
-              <>
-                <div className="flex items-end space-x-2 h-64">
-                  {/* Y-axis labels */}
-                  <div className="flex flex-col justify-between h-full text-xs text-muted-foreground pr-2 w-8">
-                    {yAxisLabels.slice().reverse().map((label) => (
-                      <div key={label} className="h-6 flex items-center justify-end">
-                        {label}
-                      </div>
-                    ))}
-                  </div>
+            {monthlyChartData.length > 0 ? (
+              <div className="relative bg-white rounded-lg p-4 border border-card-border">
+                {/* Y axis labels */}
+                <div className="absolute left-2 top-6 bottom-10 flex flex-col justify-between text-xs text-muted-foreground select-none">
+                  {yAxisLabels.slice().reverse().map((label) => (
+                    <span key={`yl-${label}`}>{label}</span>
+                  ))}
+                </div>
+                {/* Y axis line */}
+                <div className="absolute left-12 top-6 bottom-10 w-px bg-gray-200" />
 
-                  {/* Chart bars */}
-                  <div className="flex-1 flex items-end space-x-1">
-                    {linkAnalytics.chartData.map((day, index) => {
-                      const height = maxClicks > 0 ? (day.clicks / maxClicks) * 100 : 0;
-                      const barHeight = Math.max(height, day.clicks > 0 ? 2 : 0);
+                <div className="flex items-end h-72 space-x-2 pl-12 pr-2">
+                  {/* Bars */}
+                  <div className="flex-1 flex items-end space-x-2">
+                    {monthlyChartData.map((m) => {
+                      const height = roundedMax > 0 ? (m.clicks / roundedMax) * 100 : 0;
+                      const barHeight = Math.max(height, m.clicks > 0 ? 2 : 0);
                       return (
-                        <div key={day.date} className="flex-1 flex flex-col items-center">
-                          <div 
-                            className="w-full bg-primary rounded-t-sm hover:bg-primary/80 transition-colors relative group"
-                            style={{ height: `${barHeight}%` }}
-                          >
-                            {/* Tooltip */}
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                              <div className="font-semibold">{format(new Date(day.date), 'dd MMMM')}</div>
-                              <div>Clicks: {day.clicks}</div>
-                            </div>
-                          </div>
+                        <div key={m.date} className="flex-1 flex flex-col items-center">
+                          <div
+                            className="w-full bg-rose-300 border-2 border-rose-500 rounded-t-lg"
+                            style={{ height: `${barHeight}%`, minHeight: '6px' }}
+                          />
+                          <div className="text-xs text-muted-foreground mt-2">{m.date}</div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-
-                {/* X-axis labels */}
-                <div className="flex space-x-1 ml-10">
-                  {linkAnalytics.chartData.map((day) => (
-                    <div key={day.date} className="flex-1 text-center text-xs text-muted-foreground">
-                      {format(new Date(day.date), 'dd MMM')}
-                    </div>
-                  ))}
-                </div>
-              </>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-64 bg-muted/20 rounded-lg">
                 <div className="text-center">
                   <RefreshCw className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-muted-foreground">No data available for the selected period</p>
+                  <p className="text-muted-foreground">No data available</p>
                 </div>
               </div>
             )}
@@ -421,7 +445,7 @@ const Statistics = () => {
         </Card>
 
         {/* Recent Activity */}
-        <Card className="p-6">
+        <Card className="p-6 lg:col-span-1">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Recent Activity</h2>
             <Button 
@@ -478,62 +502,7 @@ const Statistics = () => {
             )}
           </div>
         </Card>
-
-          </TabsContent>
-
-          <TabsContent value="countries" className="space-y-6">
-            {/* World Map */}
-            {linkId && <WorldMap linkId={linkId} recentActivity={recentActivity} />}
-          </TabsContent>
-
-          <TabsContent value="platforms" className="space-y-6">
-            {linkId ? (
-              <PlatformsAnalytics linkId={linkId} />
-            ) : (
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Platforms</h2>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Monitor className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No link ID available</p>
-                </div>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="browsers" className="space-y-6">
-            {linkId ? (
-              <BrowserAnalytics linkId={linkId} />
-            ) : (
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Browsers</h2>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Chrome className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No link ID available</p>
-                </div>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* <TabsContent value="languages" className="space-y-6">
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Languages</h2>
-              <div className="text-center py-8 text-muted-foreground">
-                <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>Language data coming soon</p>
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="referrers" className="space-y-6">
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Referrers</h2>
-              <div className="text-center py-8 text-muted-foreground">
-                <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>Referrer data coming soon</p>
-              </div>
-            </Card>
-          </TabsContent> */}
-        </Tabs>
+        </div>
       </div>
 
       {/* View All Activity Modal */}

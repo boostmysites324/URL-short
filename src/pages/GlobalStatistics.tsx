@@ -237,90 +237,92 @@ const GlobalStatistics = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            {/* Daily Clicks Chart */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold">Daily Clicks (Last 30 Days)</h2>
-                  <p className="text-sm text-muted-foreground">Combined clicks from all your links</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Daily Clicks Chart */}
+              <Card className="p-6 lg:col-span-2">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold">Daily Clicks (Last 30 Days)</h2>
+                    <p className="text-sm text-muted-foreground">Combined clicks from all your links</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={fetchGlobalAnalytics}
+                    disabled={loading}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={fetchGlobalAnalytics}
-                  disabled={loading}
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
-              
-              <div className="relative bg-surface-secondary/30 rounded-lg p-4">
-                <div className="flex items-end justify-between h-72 space-x-1">
-                  {globalAnalytics.chartData.map((data, index) => {
-                    const maxYAxis = Math.max(...yAxisLabels);
-                    const height = (data.clicks / maxYAxis) * 100;
-                    
-                    return (
-                      <div key={index} className="flex-1 flex flex-col items-center group relative">
-                        <div 
-                          className="w-full bg-gradient-to-t from-primary to-primary-light hover:from-primary-dark hover:to-primary rounded-t-lg relative cursor-pointer chart-bar shadow-md"
-                          style={{ 
-                            height: `${height}%`,
-                            minHeight: '8px'
-                          }}
-                        >
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-card border border-card-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 animate-scale-in min-w-48">
-                            <div className="text-sm font-semibold text-card-foreground mb-2">{data.date}</div>
-                            <div className="text-sm text-primary font-medium mb-2">{data.clicks} total clicks</div>
-                            <div className="text-xs text-muted-foreground">{data.unique} unique clicks</div>
+                
+                <div className="relative bg-surface-secondary/30 rounded-lg p-4">
+                  <div className="flex items-end justify-between h-72 space-x-1">
+                    {globalAnalytics.chartData.map((data, index) => {
+                      const maxYAxis = Math.max(...yAxisLabels);
+                      const height = (data.clicks / maxYAxis) * 100;
+                      
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center group relative">
+                          <div 
+                            className="w-full bg-gradient-to-t from-primary to-primary-light hover:from-primary-dark hover:to-primary rounded-t-lg relative cursor-pointer chart-bar shadow-md"
+                            style={{ 
+                              height: `${height}%`,
+                              minHeight: '8px'
+                            }}
+                          >
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-card border border-card-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 animate-scale-in min-w-48">
+                              <div className="text-sm font-semibold text-card-foreground mb-2">{data.date}</div>
+                              <div className="text-sm text-primary font-medium mb-2">{data.clicks} total clicks</div>
+                              <div className="text-xs text-muted-foreground">{data.unique} unique clicks</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-2 transform -rotate-45 origin-left">
+                            {format(new Date(data.date), 'MMM dd')}
                           </div>
                         </div>
-                        <div className="text-xs text-muted-foreground mt-2 transform -rotate-45 origin-left">
-                          {format(new Date(data.date), 'MMM dd')}
+                      );
+                    })}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Recent Activity */}
+              <Card className="p-6 lg:col-span-1">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold">Recent Activity</h2>
+                    <p className="text-sm text-muted-foreground">Latest clicks from all your links</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowAllActivity(true)}
+                  >
+                    View All
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  {globalAnalytics.recentActivity.slice(0, 10).map((activity, index) => (
+                    <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{activity.original_url}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {activity.city}, {activity.country_name} • {activity.device_type} • {format(new Date(activity.clicked_at), 'MMM dd, HH:mm')}
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Card>
-
-            {/* Recent Activity */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold">Recent Activity</h2>
-                  <p className="text-sm text-muted-foreground">Latest clicks from all your links</p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowAllActivity(true)}
-                >
-                  View All
-                </Button>
-              </div>
-              
-              <div className="space-y-3">
-                {globalAnalytics.recentActivity.slice(0, 10).map((activity, index) => (
-                  <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{activity.original_url}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {activity.city}, {activity.country_name} • {activity.device_type} • {format(new Date(activity.clicked_at), 'MMM dd, HH:mm')}
-                        </p>
-                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {activity.browser_type}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {activity.browser_type}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </Card>
+                  ))}
+                </div>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="countries" className="space-y-6">
