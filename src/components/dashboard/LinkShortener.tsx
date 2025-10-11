@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe, Share, BarChart3, Edit, Archive, Eye, QrCode, Download, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +26,7 @@ import EditUrlModal from "@/components/links/EditUrlModal";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const LinkShortener = () => {
   const navigate = useNavigate();
@@ -33,6 +35,7 @@ const LinkShortener = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedLinks, setSelectedLinks] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [settings, setSettings] = useState({
     customDomain: false,
     analytics: true,
@@ -74,6 +77,8 @@ const LinkShortener = () => {
   const { domains } = useDomains();
   const { channels } = useChannels();
   const { campaigns } = useCampaigns();
+  const isMobile = useIsMobile();
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
 
   // URL validation function
   const isValidUrl = (string: string) => {
@@ -609,7 +614,7 @@ const LinkShortener = () => {
             </div>
             <div className="flex gap-2 sm:gap-3 items-center flex-wrap">
               {/* Customization dropdown */}
-              <DropdownMenu>
+              <DropdownMenu open={isCustomizeOpen} onOpenChange={setIsCustomizeOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="h-12 px-3 gap-2 rounded-lg hover:border-primary">
                     <Settings className="w-4 h-4" />
@@ -688,7 +693,7 @@ const LinkShortener = () => {
                         description: "",
                       });
                     }}>Reset</Button>
-                    <Button size="sm" onClick={() => { /* just close - values already bound */ }}>Apply</Button>
+                    <Button size="sm" onClick={() => setIsCustomizeOpen(false)}>Apply</Button>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
