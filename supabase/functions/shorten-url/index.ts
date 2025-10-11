@@ -116,7 +116,8 @@ serve(async (req) => {
     if (customDomain) {
       // Use custom domain if provided and valid
       domain = `https://${customDomain}`;
-      shortUrl = `${domain}/${shortCode}`;
+      // Route through our SPA redirect page so custom domains work
+      shortUrl = `${domain}/s/${shortCode}`;
       console.log('Using custom domain:', domain);
     } else {
       // Use default localhost for development

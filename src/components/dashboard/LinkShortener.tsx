@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe, Share, BarChart3, Edit, Archive, Eye, QrCode, Download, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +25,7 @@ import EditUrlModal from "@/components/links/EditUrlModal";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsMobile } from "@/hooks/use-mobile";
+ 
 
 const LinkShortener = () => {
   const navigate = useNavigate();
@@ -77,8 +76,6 @@ const LinkShortener = () => {
   const { domains } = useDomains();
   const { channels } = useChannels();
   const { campaigns } = useCampaigns();
-  const isMobile = useIsMobile();
-  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
 
   // URL validation function
   const isValidUrl = (string: string) => {
@@ -90,41 +87,61 @@ const LinkShortener = () => {
     }
   };
 
+  // Normalize input like https://example.com/path -> example.com
+  const getNormalizedDomain = (input: string) => {
+    const trimmed = input.trim();
+    if (!trimmed) return "";
+    try {
+      const hasProtocol = /^https?:\/\//i.test(trimmed);
+      const url = new URL(hasProtocol ? trimmed : `https://${trimmed}`);
+      return url.hostname.toLowerCase();
+    } catch (_) {
+      // Fallback: strip protocol manually and take first segment
+      return trimmed.replace(/^https?:\/\//i, "").split("/")[0].toLowerCase();
+    }
+  };
+
   // Domain validation function
-  const validateDomain = async (domain: string) => {
-    if (!domain) return;
-    
+  const validateDomain = async (rawInput: string) => {
+    const normalized = getNormalizedDomain(rawInput);
+    if (!rawInput) {
+      setSettings(prev => ({
+        ...prev,
+        domainValidation: { isValid: true, isChecking: false, message: "" }
+      }));
+      return;
+    }
+
     setSettings(prev => ({
       ...prev,
       domainValidation: { isValid: false, isChecking: true, message: "Validating domain..." }
     }));
 
     try {
-      // Basic domain format validation
-      const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
-      if (!domainRegex.test(domain)) {
+      // Basic domain format validation (no protocol/path)
+      const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
+      if (!normalized || !domainRegex.test(normalized)) {
         setSettings(prev => ({
           ...prev,
-          domainValidation: { isValid: false, isChecking: false, message: "Invalid domain format" }
+          domainValidation: { isValid: false, isChecking: false, message: "Enter a domain like 247l.ink (no https://)" }
         }));
         return;
       }
 
-      // Check if domain is reachable
-      const response = await fetch(`https://${domain}`, { 
-        method: 'HEAD', 
+      await fetch(`https://${normalized}`, {
+        method: 'HEAD',
         mode: 'no-cors',
         signal: AbortSignal.timeout(5000)
       });
-      
+
       setSettings(prev => ({
         ...prev,
-        domainValidation: { isValid: true, isChecking: false, message: "Domain is valid and reachable" }
+        domainValidation: { isValid: true, isChecking: false, message: "Domain looks good" }
       }));
     } catch (error) {
       setSettings(prev => ({
         ...prev,
-        domainValidation: { isValid: false, isChecking: false, message: "Domain is not reachable or invalid" }
+        domainValidation: { isValid: false, isChecking: false, message: "Could not verify domain reachability" }
       }));
     }
   };
@@ -197,7 +214,7 @@ const LinkShortener = () => {
       }
 
       const linkSettings = {
-        customDomain: settings.customDomain && settings.domainValidation.isValid ? settings.customDomainUrl : undefined,
+        customDomain: settings.customDomain && settings.domainValidation.isValid ? getNormalizedDomain(settings.customDomainUrl) : undefined,
         analyticsEnabled: settings.analytics,
         expiresAt: settings.expiration && settings.expirationDate ? convertISTToUTC(settings.expirationDate) : undefined,
         password: settings.password && settings.passwordValue ? settings.passwordValue : undefined,
@@ -613,33 +630,37 @@ const LinkShortener = () => {
               )}
             </div>
             <div className="flex gap-2 sm:gap-3 items-center flex-wrap">
-              {/* Customization dropdown */}
-              <DropdownMenu open={isCustomizeOpen} onOpenChange={setIsCustomizeOpen}>
-                <DropdownMenuTrigger asChild>
+              <Dialog open={isCustomizeOpen} onOpenChange={setIsCustomizeOpen}>
+                <DialogTrigger asChild>
                   <Button variant="outline" className="h-12 px-3 gap-2 rounded-lg hover:border-primary">
                     <Settings className="w-4 h-4" />
                     <span className="hidden sm:inline">Customize</span>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-[92vw] max-w-[520px] p-4 rounded-xl bg-card border border-card-border shadow-xl space-y-3">
-                      <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-card-foreground">Customize</p>
-                      <p className="text-xs text-muted-foreground">Fine-tune options before shortening</p>
-                      </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                </DialogTrigger>
+                <DialogContent className="w-[92vw] max-w-[520px] max-h-[80vh] overflow-y-auto p-4 rounded-xl">
+                  <DialogHeader>
+                    <DialogTitle>Customize</DialogTitle>
+                    <DialogDescription>Fine-tune options before shortening</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
                     {/* Domain */}
-                        <div className="space-y-2">
+                    <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Domain</Label>
-                          <Input
-                        placeholder="https://b2u.io"
-                            value={settings.customDomainUrl}
-                        onChange={(e) => setSettings({ ...settings, customDomainUrl: e.target.value, customDomain: !!e.target.value })}
+                      <Input
+                        placeholder="yourdomain.com"
+                        value={settings.customDomainUrl}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSettings({ ...settings, customDomainUrl: value, customDomain: !!value });
+                          validateDomain(value);
+                        }}
                       />
-                      <p className="text-[10px] text-muted-foreground">Leave blank to use the default domain</p>
-                        </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        {settings.domainValidation.isChecking
+                          ? 'Validating domain...'
+                          : (settings.domainValidation.message || 'Leave blank to use the default domain')}
+                      </p>
+                    </div>
                     {/* Redirect */}
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Redirect</Label>
@@ -647,56 +668,52 @@ const LinkShortener = () => {
                         <SelectTrigger className="w-full h-9 rounded-md"><SelectValue placeholder="Direct" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="direct">Direct</SelectItem>
-                          <SelectItem value="301">301</SelectItem>
-                          <SelectItem value="302">302</SelectItem>
+                          <SelectItem value="masked">Masked</SelectItem>
+                          <SelectItem value="splash">Splash Page</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={settings.redirectType} onValueChange={(v) => setSettings({ ...settings, redirectType: v })}>
+                        <SelectTrigger className="w-full h-9 rounded-md"><SelectValue placeholder="Direct" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="direct">Direct</SelectItem>
+                          <SelectItem value="masked">Masked</SelectItem>
+                          <SelectItem value="splash">Splash Page</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     {/* Custom alias */}
-                    <div className="space-y-2 md:col-span-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Custom</Label>
                       <div className="relative">
                         <Globe className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <Input className="pl-8 rounded-md" placeholder="Type your custom alias here" value={settings.customAlias} onChange={(e) => setSettings({ ...settings, customAlias: e.target.value })} />
-                    </div>
                       </div>
+                    </div>
                     {/* Channel */}
-                        <div className="space-y-2">
+                    <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Channel</Label>
                       <Input className="rounded-md" placeholder="Assign link to a channel" value={settings.channelId} onChange={(e) => setSettings({ ...settings, channelId: e.target.value })} />
-                        </div>
+                    </div>
                     {/* Password */}
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Password</Label>
                       <div className="relative">
                         <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <Input className="pl-8 rounded-md" type="password" placeholder="Type your password here" value={settings.passwordValue} onChange={(e) => setSettings({ ...settings, password: !!e.target.value, passwordValue: e.target.value })} />
-                    </div>
                       </div>
+                    </div>
                     {/* Description */}
-                    <div className="space-y-2 md:col-span-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Description</Label>
                       <Input className="rounded-md" placeholder="Type your description here" value={settings.description} onChange={(e) => setSettings({ ...settings, description: e.target.value })} />
-                        </div>
                     </div>
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      setSettings({
-                        ...settings,
-                        customDomainUrl: "",
-                        customDomain: false,
-                        redirectType: "direct",
-                        customAlias: "",
-                        channelId: "",
-                        passwordValue: "",
-                        password: false,
-                        description: "",
-                      });
-                    }}>Reset</Button>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-3">
+                    <Button variant="ghost" size="sm" onClick={() => { setSettings({ ...settings, customDomainUrl: "", customDomain: false, redirectType: "direct", customAlias: "", channelId: "", passwordValue: "", password: false, description: "" }); }}>Reset</Button>
                     <Button size="sm" onClick={() => setIsCustomizeOpen(false)}>Apply</Button>
                   </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </DialogContent>
+              </Dialog>
                     
                     <Button 
                 onClick={handleShorten}
