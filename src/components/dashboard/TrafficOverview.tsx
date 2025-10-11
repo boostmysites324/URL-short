@@ -6,6 +6,7 @@ import { CalendarDays, TrendingUp, MousePointer, Users } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 const TrafficOverview = () => {
@@ -17,6 +18,7 @@ const TrafficOverview = () => {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const { analytics, loading } = useAnalytics(startDate, endDate);
+  const isMobile = useIsMobile();
 
   const formatDateRange = (start: Date, end: Date) => {
     return `${format(start, "MM/dd/yyyy")} - ${format(end, "MM/dd/yyyy")}`;
@@ -176,10 +178,10 @@ const TrafficOverview = () => {
             </div>
           </div>
           
-          <div className="relative bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+          <div className="relative bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm">
             
             {/* Gridlines */}
-            <div className="absolute left-12 right-4 top-6 bottom-12 pointer-events-none">
+            <div className="absolute " style={{left: isMobile ? 44 : 48, right: isMobile ? 8 : 16, top: 24, bottom: isMobile ? 40 : 48, pointerEvents: 'none'}}>
               {yAxisLabels.slice().map((label, i) => {
                 const maxYAxis = Math.max(...yAxisLabels);
                 const top = (1 - (label / (maxYAxis || 1))) * 100;
@@ -194,7 +196,9 @@ const TrafficOverview = () => {
             </div>
 
             {/* Bars */}
-            <div className="flex items-end justify-between h-72 space-x-1 pl-12 pr-4">
+            <div className={""}>
+              <div className="overflow-x-auto">
+                <div className="flex items-end justify-between h-64 sm:h-72 space-x-1" style={{paddingLeft: isMobile ? 44 : 48, paddingRight: isMobile ? 8 : 16, minWidth: isMobile ? `${chartData15.length * 28}px` : 'auto'}}>
               {chartData15.map((data, index) => {
                 const maxYAxis = Math.max(...yAxisLabels);
                 const height = (data.clicks / (maxYAxis || 1)) * 100;
@@ -208,22 +212,25 @@ const TrafficOverview = () => {
                         minHeight: '6px'
                       }}
                     >
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-card border border-card-border text-card-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 z-20 whitespace-nowrap">
-                        <div className="font-semibold text-sm">{format(new Date(data.date), 'dd MMMM')}</div>
-                        <div className="text-muted-foreground">Clicks: <span className="font-medium text-card-foreground">{data.clicks}</span></div>
-                      </div>
+                      {!isMobile && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-card border border-card-border text-card-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 z-20 whitespace-nowrap">
+                          <div className="font-semibold text-sm">{format(new Date(data.date), 'dd MMMM')}</div>
+                          <div className="text-muted-foreground">Clicks: <span className="font-medium text-card-foreground">{data.clicks}</span></div>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-xs text-muted-foreground mt-2 font-medium transform -rotate-45 origin-left whitespace-nowrap">
-                      {format(new Date(data.date), 'dd MMMM')}
+                    <span className={isMobile ? "text-[10px] text-muted-foreground mt-1 font-medium whitespace-nowrap" : "text-xs text-muted-foreground mt-2 font-medium transform -rotate-45 origin-left whitespace-nowrap"}>
+                      {format(new Date(data.date), isMobile ? 'dd MMM' : 'dd MMMM')}
                     </span>
                   </div>
                 );
               })}
+                </div>
+              </div>
             </div>
 
             {/* Y-axis labels */}
-            <div className="absolute left-2 top-6 bottom-12 flex flex-col justify-between text-xs text-gray-600 font-medium">
+            <div className="absolute flex flex-col justify-between text-[10px] sm:text-xs text-gray-600 font-medium" style={{left: 8, top: 24, bottom: isMobile ? 40 : 48}}>
               {yAxisLabels.slice().reverse().map((label, index) => (
                 <span key={`ylabel-${label}-${index}`}>{label}</span>
               ))}
