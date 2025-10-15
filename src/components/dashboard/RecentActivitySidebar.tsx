@@ -268,11 +268,11 @@ const RecentActivitySidebar = () => {
 
   return (
     <Card className="h-full flex flex-col bg-card border-card-border">
-      <div className="p-4 border-b border-card-border">
+      <div className="p-3 sm:p-4 border-b border-card-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <TrendingUp className="w-4 h-4 text-primary" />
-            <h3 className="font-semibold text-card-foreground">Recent Activity</h3>
+            <h3 className="font-semibold text-card-foreground text-sm sm:text-base">Recent Activity</h3>
           </div>
           <Button
             variant="ghost"
@@ -287,7 +287,7 @@ const RecentActivitySidebar = () => {
         <p className="text-xs text-muted-foreground mt-1">Live click tracking</p>
       </div>
 
-      <div className="p-4 flex-1 flex flex-col">
+      <div className="p-3 sm:p-4 flex-1 flex flex-col">
         {loading ? (
           <div className="flex items-center justify-center py-4">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -339,26 +339,26 @@ const RecentActivitySidebar = () => {
               const stats = statsByLink[activity.link_id];
               const shortDisplay = activity.short_url?.replace('https://', '').replace('http://', '') || 'Link';
               return (
-                <div key={activity.id} className="bg-white rounded-lg p-3 border border-card-border hover:shadow-sm transition-shadow">
+                <div key={activity.id} className="bg-white rounded-lg p-2 sm:p-3 border border-card-border hover:shadow-sm transition-shadow">
                   {/* Top row: short link and time */}
                   <div className="flex items-center justify-between mb-1">
-                    <a href={activity.short_url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline truncate">
+                    <a href={activity.short_url} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm font-semibold text-primary hover:underline truncate flex-1 mr-2">
                       {shortDisplay}
                     </a>
-                    <span className="text-xs text-muted-foreground">{formatTimeAgo(activity.created_at)}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">{formatTimeAgo(activity.created_at)}</span>
                   </div>
 
                   {/* Middle row: location, device, browser, referrer */}
-                  <div className="flex items-center flex-wrap gap-2 text-xs text-muted-foreground">
-                    <span>{activity.city}, {activity.country}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">{getDeviceIcon(activity.device_type)} {activity.device_type}</span>
-                    <span>•</span>
-                    <Badge className={`px-1.5 py-0 ${getBrowserColor(activity.browser)}`}>{activity.browser}</Badge>
+                  <div className="flex items-center flex-wrap gap-1 sm:gap-2 text-xs text-muted-foreground">
+                    <span className="truncate">{activity.city}, {activity.country}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="flex items-center gap-1">{getDeviceIcon(activity.device_type)} <span className="hidden sm:inline">{activity.device_type}</span></span>
+                    <span className="hidden sm:inline">•</span>
+                    <Badge className={`px-1 sm:px-1.5 py-0 text-xs ${getBrowserColor(activity.browser)}`}>{activity.browser}</Badge>
                     {activity.referrer && (
                       <>
-                        <span>•</span>
-                        <a href={activity.referrer} target="_blank" rel="noopener noreferrer" className="truncate max-w-[160px] text-primary hover:underline">
+                        <span className="hidden sm:inline">•</span>
+                        <a href={activity.referrer} target="_blank" rel="noopener noreferrer" className="truncate max-w-[120px] sm:max-w-[160px] text-primary hover:underline">
                           {activity.referrer?.replace('https://', '').replace('http://', '')}
                         </a>
                       </>

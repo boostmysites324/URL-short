@@ -36,11 +36,11 @@ const LinkShortener = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [settings, setSettings] = useState({
-    customDomain: false,
+    customDomain: true,
     analytics: true,
     expiration: false,
     password: false,
-    customDomainUrl: "",
+    customDomainUrl: "247l.ink",
     expirationDate: undefined as Date | undefined,
     passwordValue: "",
     customAlias: "",
@@ -49,9 +49,9 @@ const LinkShortener = () => {
     channelId: "",
     campaignId: "",
     domainValidation: {
-      isValid: false,
+      isValid: true,
       isChecking: false,
-      message: ""
+      message: "Using fixed domain 247l.ink"
     }
   });
   const [showShortLinkModal, setShowShortLinkModal] = useState(false);
@@ -294,7 +294,7 @@ const LinkShortener = () => {
 
     try {
       const linkSettings = {
-        customDomain: settings.customDomain ? "short.ly" : undefined,
+        customDomain: settings.customDomain ? "247l.ink" : undefined,
         analyticsEnabled: settings.analytics,
         expiresAt: settings.expiration ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
         password: settings.password ? "password123" : undefined
@@ -586,19 +586,19 @@ const LinkShortener = () => {
   ); // useLinks already limits to 30 per page
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 xl:gap-6 animate-fade-in">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 xl:gap-6 animate-fade-in">
       {/* Main Content - wider */}
-      <div className="lg:col-span-8 xl:col-span-8 space-y-6">
+      <div className="lg:col-span-8 xl:col-span-8 space-y-4 sm:space-y-6">
         {/* Enhanced Shorten Link Card */}
-        <Card className="p-6 lg:p-7 xl:p-8 card-gradient shadow-card border-card-border hover-glow group">
-        <div className="space-y-6">
+        <Card className="p-4 sm:p-6 lg:p-7 xl:p-8 card-gradient shadow-card border-card-border hover-glow group">
+        <div className="space-y-4 sm:space-y-6">
           <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-300">
-              <LinkIcon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
+            <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-300">
+              <LinkIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary group-hover:scale-110 transition-transform" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-card-foreground">Shorten Link</h3>
-              <p className="text-sm text-muted-foreground">Transform your long URLs into shareable short links</p>
+              <h3 className="text-lg sm:text-xl font-bold text-card-foreground">Shorten Link</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">Transform your long URLs into shareable short links</p>
             </div>
           </div>
           
@@ -629,15 +629,15 @@ const LinkShortener = () => {
                 </Button>
               )}
             </div>
-            <div className="flex gap-2 sm:gap-3 items-center flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
               <Dialog open={isCustomizeOpen} onOpenChange={setIsCustomizeOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="h-12 px-3 gap-2 rounded-lg hover:border-primary">
+                  <Button variant="outline" className="h-12 px-3 gap-2 rounded-lg hover:border-primary flex-1 sm:flex-none">
                     <Settings className="w-4 h-4" />
-                    <span className="hidden sm:inline">Customize</span>
+                    <span className="text-sm">Customize</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="w-[92vw] max-w-[520px] max-h-[80vh] overflow-y-auto p-4 rounded-xl">
+                <DialogContent className="w-[95vw] max-w-[520px] max-h-[85vh] overflow-y-auto p-3 sm:p-4 rounded-xl mx-2 sm:mx-0">
                   <DialogHeader>
                     <DialogTitle>Customize</DialogTitle>
                     <DialogDescription>Fine-tune options before shortening</DialogDescription>
@@ -649,11 +649,7 @@ const LinkShortener = () => {
                       <Input
                         placeholder="yourdomain.com"
                         value={settings.customDomainUrl}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setSettings({ ...settings, customDomainUrl: value, customDomain: !!value });
-                          validateDomain(value);
-                        }}
+                        disabled
                       />
                       <p className="text-[10px] text-muted-foreground">
                         {settings.domainValidation.isChecking
@@ -664,14 +660,6 @@ const LinkShortener = () => {
                     {/* Redirect */}
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Redirect</Label>
-                      <Select value={settings.redirectType} onValueChange={(v) => setSettings({ ...settings, redirectType: v })}>
-                        <SelectTrigger className="w-full h-9 rounded-md"><SelectValue placeholder="Direct" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="direct">Direct</SelectItem>
-                          <SelectItem value="masked">Masked</SelectItem>
-                          <SelectItem value="splash">Splash Page</SelectItem>
-                        </SelectContent>
-                      </Select>
                       <Select value={settings.redirectType} onValueChange={(v) => setSettings({ ...settings, redirectType: v })}>
                         <SelectTrigger className="w-full h-9 rounded-md"><SelectValue placeholder="Direct" /></SelectTrigger>
                         <SelectContent>
@@ -709,7 +697,7 @@ const LinkShortener = () => {
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2 pt-3">
-                    <Button variant="ghost" size="sm" onClick={() => { setSettings({ ...settings, customDomainUrl: "", customDomain: false, redirectType: "direct", customAlias: "", channelId: "", passwordValue: "", password: false, description: "" }); }}>Reset</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setSettings({ ...settings, customDomainUrl: "247l.ink", customDomain: true, redirectType: "direct", customAlias: "", channelId: "", passwordValue: "", password: false, description: "", domainValidation: { isValid: true, isChecking: false, message: "Using fixed domain 247l.ink" } }); }}>Reset</Button>
                     <Button size="sm" onClick={() => setIsCustomizeOpen(false)}>Apply</Button>
                   </div>
                 </DialogContent>
@@ -717,24 +705,43 @@ const LinkShortener = () => {
                     
                     <Button 
                 onClick={handleShorten}
-                className="h-12 px-8 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary shadow-lg hover:shadow-glow transition-all duration-300 group"
+                className="h-12 px-6 sm:px-8 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary shadow-lg hover:shadow-glow transition-all duration-300 group flex-1 sm:flex-none"
                 disabled={!inputUrl.trim() || loading}
               >
                 {loading ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Processing...</span>
+                    <span className="text-sm">Processing...</span>
                   </div>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                    Shorten
+                    <span className="text-sm">Shorten</span>
                   </>
                 )}
               </Button>
 
               {/* Mode toggle (compact) */}
-              <div className="hidden sm:flex items-center space-x-2 ml-2">
+              <div className="flex sm:hidden items-center space-x-1 w-full justify-center mt-2">
+            <Button
+                  variant={mode === 'single' ? 'default' : 'outline'}
+              size="sm"
+                  onClick={() => setMode('single')}
+              className="flex-1"
+            >
+              Single
+            </Button>
+            <Button
+                  variant={mode === 'multiple' ? 'default' : 'outline'}
+              size="sm"
+                  onClick={() => setMode('multiple')}
+              className="flex-1"
+            >
+              Multiple
+            </Button>
+          </div>
+          
+          <div className="hidden sm:flex items-center space-x-2 ml-2">
             <Button
                   variant={mode === 'single' ? 'default' : 'outline'}
               size="sm"
@@ -759,23 +766,23 @@ const LinkShortener = () => {
 
       {/* Enhanced Recent Links */}
       <Card className="card-gradient shadow-card border-card-border hover-glow animate-slide-up">
-        <div className="p-5 lg:p-6 border-b border-card-border">
-          <div className="flex items-center justify-between">
+        <div className="p-4 sm:p-5 lg:p-6 border-b border-card-border">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
             <div>
-              <h3 className="text-xl font-bold text-card-foreground">Recent Links</h3>
-              <p className="text-sm text-muted-foreground mt-1">Manage and track your shortened URLs</p>
+              <h3 className="text-lg sm:text-xl font-bold text-card-foreground">Recent Links</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage and track your shortened URLs</p>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   placeholder="Search links..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
+                  className="pl-10 w-full sm:w-64"
                 />
               </div>
-              <Button variant="ghost" size="sm" className="hover-lift">
+              <Button variant="ghost" size="sm" className="hover-lift flex-shrink-0">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </div>
@@ -989,7 +996,7 @@ const LinkShortener = () => {
       </div>
 
       {/* Recent Activity Sidebar - narrower */}
-      <div className="lg:col-span-4 xl:col-span-4">
+      <div className="lg:col-span-4 xl:col-span-4 mt-6 lg:mt-0">
         <RecentActivitySidebar />
       </div>
 

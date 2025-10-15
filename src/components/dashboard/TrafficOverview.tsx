@@ -41,13 +41,13 @@ const TrafficOverview = () => {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-card-foreground bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+          <h2 className="text-2xl sm:text-3xl font-bold text-card-foreground bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
             Traffic Overview
           </h2>
-          <p className="text-muted-foreground mt-1">Monitor your link performance in real-time</p>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Monitor your link performance in real-time</p>
         </div>
         
         {/* Working Date Range Picker */}
@@ -55,23 +55,23 @@ const TrafficOverview = () => {
           <PopoverTrigger asChild>
             <Button 
               variant="outline" 
-              className="flex items-center space-x-2 w-fit hover-lift hover:border-primary transition-all duration-300 group"
+              className="flex items-center space-x-2 w-full sm:w-fit hover-lift hover:border-primary transition-all duration-300 group"
             >
               <CalendarDays className="w-4 h-4 group-hover:text-primary transition-colors" />
-              <span className="text-sm font-medium">{formatDateRange(startDate, endDate)}</span>
+              <span className="text-sm font-medium truncate">{formatDateRange(startDate, endDate)}</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 bg-card border-card-border shadow-lg z-50" align="start">
-            <div className="p-4 space-y-4">
+          <PopoverContent className="w-auto p-0 bg-card border-card-border shadow-lg z-50 mx-4 sm:mx-0" align="start">
+            <div className="p-3 sm:p-4 space-y-4">
               <div className="text-sm font-medium text-card-foreground">Select Date Range</div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-muted-foreground">Start Date</label>
                   <Calendar
                     mode="single"
                     selected={startDate}
                     onSelect={(date) => date && setStartDate(date)}
-                    className={cn("p-3 pointer-events-auto")}
+                    className={cn("p-2 sm:p-3 pointer-events-auto")}
                   />
                 </div>
                 <div>
@@ -80,15 +80,15 @@ const TrafficOverview = () => {
                     mode="single"
                     selected={endDate}
                     onSelect={(date) => date && setEndDate(date)}
-                    className={cn("p-3 pointer-events-auto")}
+                    className={cn("p-2 sm:p-3 pointer-events-auto")}
                   />
                 </div>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" size="sm" onClick={() => setIsDatePickerOpen(false)}>
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+                <Button variant="outline" size="sm" onClick={() => setIsDatePickerOpen(false)} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button size="sm" onClick={() => setIsDatePickerOpen(false)}>
+                <Button size="sm" onClick={() => setIsDatePickerOpen(false)} className="w-full sm:w-auto">
                   Apply
                 </Button>
               </div>
@@ -98,50 +98,52 @@ const TrafficOverview = () => {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <Card className="p-4 sm:p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">
                 Total Clicks
               </p>
-              <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-primary transition-colors">
+              <p className="text-3xl sm:text-4xl font-bold text-card-foreground mt-2 group-hover:text-primary transition-colors">
                 {analytics.totalClicks}
               </p>
-              <div className="flex items-center mt-2 text-sm">
-                <TrendingUp className="w-4 h-4 text-success mr-1" />
+              <div className="flex items-center mt-2 text-xs sm:text-sm">
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-success mr-1" />
                 <span className="text-success font-medium">+12.5%</span>
-                <span className="text-muted-foreground ml-1">from last month</span>
+                <span className="text-muted-foreground ml-1 hidden sm:inline">from last month</span>
+                <span className="text-muted-foreground ml-1 sm:hidden">vs last</span>
               </div>
             </div>
-            <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-300">
-              <MousePointer className="w-8 h-8 text-primary group-hover:scale-110 transition-transform" />
+            <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-300">
+              <MousePointer className="w-6 h-6 sm:w-8 sm:h-8 text-primary group-hover:scale-110 transition-transform" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up" style={{animationDelay: '0.1s'}}>
+        <Card className="p-4 sm:p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up" style={{animationDelay: '0.1s'}}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground group-hover:text-success transition-colors">
                 Clicks (Current Period)
               </p>
-              <p className="text-4xl font-bold text-card-foreground mt-2 group-hover:text-success transition-colors">
+              <p className="text-3xl sm:text-4xl font-bold text-card-foreground mt-2 group-hover:text-success transition-colors">
                 {analytics.currentPeriodClicks}
               </p>
-              <div className="flex items-center mt-2 text-sm">
-                <TrendingUp className="w-4 h-4 text-success mr-1" />
+              <div className="flex items-center mt-2 text-xs sm:text-sm">
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-success mr-1" />
                 <span className="text-success font-medium">+8.2%</span>
-                <span className="text-muted-foreground ml-1">vs last period</span>
+                <span className="text-muted-foreground ml-1 hidden sm:inline">vs last period</span>
+                <span className="text-muted-foreground ml-1 sm:hidden">vs last</span>
               </div>
             </div>
-            <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-success/20 to-success/10 rounded-2xl group-hover:from-success/30 group-hover:to-success/20 transition-all duration-300">
-              <TrendingUp className="w-8 h-8 text-success group-hover:scale-110 transition-transform" />
+            <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-success/20 to-success/10 rounded-2xl group-hover:from-success/30 group-hover:to-success/20 transition-all duration-300">
+              <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-success group-hover:scale-110 transition-transform" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up" style={{animationDelay: '0.2s'}}>
+        <Card className="p-4 sm:p-6 card-gradient shadow-card border-card-border hover-lift group cursor-pointer animate-slide-up sm:col-span-2 lg:col-span-1" style={{animationDelay: '0.2s'}}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground group-hover:text-warning transition-colors">

@@ -39,6 +39,11 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
     message: ''
   });
 
+  // New editable fields: destination URL and custom alias (short code)
+  const [destinationUrl, setDestinationUrl] = useState('');
+  const [customAlias, setCustomAlias] = useState('');
+  const [aliasValidation, setAliasValidation] = useState({ isValid: true, message: '' });
+
   // Initialize settings from link data
   useEffect(() => {
     if (link) {
@@ -51,6 +56,10 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
         passwordEnabled: !!link.password_hash,
         passwordValue: ''
       });
+
+      setDestinationUrl(link.original_url || '');
+      // Prefer existing short_code; fall back to custom_alias if present
+      setCustomAlias(link.short_code || link.custom_alias || '');
     }
   }, [link]);
 
@@ -86,11 +95,86 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
     return utcDate;
   };
 
+  const isValidUrl = (value: string) => {
+    try {
+      // Ensure protocol is present for consistency
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const isValidAliasFormat = (value: string) => {
+    if (!value) return false;
+    // 3-64 chars, alphanumerics, hyphen and underscore
+    const re = /^[A-Za-z0-9-_]{3,64}$/;
+    return re.test(value);
+  };
+
+  const getBaseDomain = (): string => {
+    if (settings.customDomain && settings.customDomainUrl) {
+      return `https://${settings.customDomainUrl}`;
+    }
+    try {
+      const parsed = new URL(link.short_url);
+      return `${parsed.protocol}//${parsed.host}`;
+    } catch {
+      return 'https://247l.ink';
+    }
+  };
+
+  const previewShortUrl = `${getBaseDomain()}/s/${customAlias || link?.short_code || ''}`;
+
   const handleSave = async () => {
     if (!link) return;
 
     setLoading(true);
     try {
+      // Validate destination URL
+      if (!destinationUrl || !isValidUrl(destinationUrl)) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid destination URL (http/https)",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate alias format
+      if (!isValidAliasFormat(customAlias)) {
+        setAliasValidation({ isValid: false, message: 'Alias must be 3-64 chars: letters, numbers, - or _' });
+        toast({
+          title: "Error",
+          description: 'Invalid alias format',
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Uniqueness check for alias (exclude current link)
+      if (customAlias !== link.short_code) {
+        const { data: existing, error: existingError } = await supabase
+          .from('links')
+          .select('id')
+          .eq('short_code', customAlias)
+          .neq('id', link.id)
+          .maybeSingle();
+
+        if (existingError) {
+          console.error('Alias uniqueness check error:', existingError);
+        }
+        if (existing) {
+          setAliasValidation({ isValid: false, message: 'This alias is already in use' });
+          toast({
+            title: "Alias already taken",
+            description: "Please choose a different alias",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       // Validate settings
       if (settings.customDomain && !settings.customDomainUrl) {
         toast({
@@ -130,7 +214,11 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
 
       // Prepare update data
       const updateData: any = {
-        analytics_enabled: settings.analyticsEnabled
+        analytics_enabled: settings.analyticsEnabled,
+        original_url: destinationUrl,
+        short_code: customAlias,
+        short_url: `${getBaseDomain()}/s/${customAlias}`,
+        custom_alias: customAlias
       };
 
       if (settings.customDomain) {
@@ -197,6 +285,36 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Destination URL */}
+          <div className="space-y-2">
+            <Label htmlFor="destination-url">Destination URL</Label>
+            <Input
+              id="destination-url"
+              placeholder="https://example.com/page"
+              value={destinationUrl}
+              onChange={(e) => setDestinationUrl(e.target.value)}
+            />
+          </div>
+
+          {/* Custom Alias */}
+          <div className="space-y-2">
+            <Label htmlFor="custom-alias">Custom alias</Label>
+            <Input
+              id="custom-alias"
+              placeholder="my-custom-code"
+              value={customAlias}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                setCustomAlias(v);
+                setAliasValidation({ isValid: isValidAliasFormat(v), message: isValidAliasFormat(v) ? '' : '3-64 chars: letters, numbers, - or _' });
+              }}
+            />
+            {!aliasValidation.isValid && (
+              <p className="text-sm text-red-600">{aliasValidation.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">Preview: {previewShortUrl}</p>
+          </div>
+
           {/* Custom Domain */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">

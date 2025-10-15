@@ -62,6 +62,16 @@ serve(async (req) => {
       userId = user?.id;
     }
 
+    // Helper to generate a random base62 code
+    const generateRandomCode = (length: number = 7) => {
+      const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+      }
+      return result;
+    };
+
     // Generate unique short code or use custom alias
     let shortCode = '';
     let isUnique = false;
@@ -86,15 +96,25 @@ serve(async (req) => {
       isUnique = true;
     } else {
       while (!isUnique && attempts < maxAttempts) {
-        const { data: generatedCode } = await supabaseClient.rpc('generate_short_code');
-        shortCode = generatedCode;
-        
+        let generated: string | null = null;
+        try {
+          const { data: generatedCode, error: rpcError } = await supabaseClient.rpc('generate_short_code');
+          if (rpcError) {
+            console.warn('RPC generate_short_code failed, falling back to random generator:', rpcError.message);
+          }
+          generated = generatedCode ?? null;
+        } catch (e) {
+          console.warn('RPC generate_short_code threw, falling back to random generator');
+        }
+
+        shortCode = generated || generateRandomCode(7);
+
         const { data: existingLink } = await supabaseClient
           .from('links')
           .select('id')
           .eq('short_code', shortCode)
-          .single();
-        
+          .maybeSingle();
+
         if (!existingLink) {
           isUnique = true;
         }
@@ -104,13 +124,14 @@ serve(async (req) => {
 
     if (!isUnique) {
       return new Response(
-        JSON.stringify({ error: 'Failed to generate unique short code' }),
+        JSON.stringify({ error: 'Failed to generate unique short code after multiple attempts' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Generate short URL with custom domain or default
-    let domain = 'http://localhost:8081'; // Default for development
+    // Use production domain 247l.ink by default
+    let domain = 'https://247l.ink';
     let shortUrl = '';
     
     if (customDomain) {
@@ -120,7 +141,7 @@ serve(async (req) => {
       shortUrl = `${domain}/s/${shortCode}`;
       console.log('Using custom domain:', domain);
     } else {
-      // Use default localhost for development
+      // Use default production domain
       shortUrl = `${domain}/s/${shortCode}`;
       console.log('Using default domain:', domain);
     }
@@ -160,7 +181,7 @@ serve(async (req) => {
     if (error) {
       console.error('Database error:', error);
       return new Response(
-        JSON.stringify({ error: 'Failed to create short link' }),
+        JSON.stringify({ error: 'Failed to create short link', details: error?.message || error }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

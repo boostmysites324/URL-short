@@ -264,24 +264,24 @@ const Statistics = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => navigate('/')}>
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <Button variant="ghost" onClick={() => navigate('/')} className="flex-shrink-0">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold">Link Analytics</h1>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold truncate">Link Analytics</h1>
                 <div className="flex items-center space-x-2 mt-1">
                   <a 
                     href={selectedLink.short_url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline flex items-center space-x-1"
+                    className="text-primary hover:underline flex items-center space-x-1 min-w-0"
                   >
-                    <span className="font-mono text-sm">{selectedLink.short_url}</span>
-                    <ExternalLink className="w-3 h-3" />
+                    <span className="font-mono text-xs sm:text-sm truncate">{selectedLink.short_url}</span>
+                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
                   </a>
                 </div>
               </div>
@@ -290,74 +290,74 @@ const Statistics = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Summary Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Clicks</p>
-                <p className="text-3xl font-bold">{linkAnalytics.totalClicks}</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Clicks</p>
+                <p className="text-xl sm:text-3xl font-bold">{linkAnalytics.totalClicks}</p>
               </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                <RefreshCw className="w-6 h-6 text-primary" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                <RefreshCw className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Unique Clicks</p>
-                <p className="text-3xl font-bold">{linkAnalytics.uniqueClicks}</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Unique Clicks</p>
+                <p className="text-xl sm:text-3xl font-bold">{linkAnalytics.uniqueClicks}</p>
               </div>
-              <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-success" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-success/10 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 sm:w-6 sm:h-6 text-success" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Top Country</p>
-                <p className="text-lg font-semibold flex items-center space-x-2">
-                  <span>🇮🇳</span>
-                  <span>{linkAnalytics.topCountry}</span>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Top Country</p>
+                <p className="text-sm sm:text-lg font-semibold flex items-center space-x-1 sm:space-x-2">
+                  <span className="text-lg sm:text-xl">🇮🇳</span>
+                  <span className="truncate">{linkAnalytics.topCountry}</span>
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <MapPin className="w-6 h-6 text-blue-600" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <MapPin className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Top Referrer</p>
-                <p className="text-sm font-semibold truncate max-w-[150px]">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Top Referrer</p>
+                <p className="text-xs sm:text-sm font-semibold truncate max-w-[120px] sm:max-w-[150px]">
                   {linkAnalytics.topReferrer === 'Direct' ? 'Direct' : 
-                   linkAnalytics.topReferrer.length > 20 ? 
-                   linkAnalytics.topReferrer.substring(0, 20) + '...' : 
+                   linkAnalytics.topReferrer.length > 15 ? 
+                   linkAnalytics.topReferrer.substring(0, 15) + '...' : 
                    linkAnalytics.topReferrer}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Globe className="w-6 h-6 text-green-600" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
               </div>
             </div>
           </Card>
         </div>
 
         {/* Main content grid (no tabs) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Clicks Section - Monthly chart and export */}
-            <Card className="p-6 lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
+            <Card className="p-4 sm:p-6 lg:col-span-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3 sm:gap-0">
             <div>
-              <h2 className="text-xl font-semibold">Clicks</h2>
-              <p className="text-sm text-muted-foreground">Last 12 months</p>
+              <h2 className="text-lg sm:text-xl font-semibold">Clicks</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">Last 12 months</p>
             </div>
             <Button 
               onClick={async () => {
@@ -396,37 +396,38 @@ const Statistics = () => {
                   console.error('Export error', e);
                 }
               }}
+              className="w-full sm:w-auto"
             >
-              Export Stats
+              <span className="text-sm">Export Stats</span>
             </Button>
           </div>
 
           {/* Monthly Bar Chart */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {monthlyChartData.length > 0 ? (
-              <div className="relative bg-white rounded-lg p-4 border border-card-border">
+              <div className="relative bg-white rounded-lg p-3 sm:p-4 border border-card-border">
                 {/* Y axis labels */}
-                <div className="absolute left-2 top-6 bottom-10 flex flex-col justify-between text-xs text-muted-foreground select-none">
+                <div className="absolute left-1 sm:left-2 top-4 sm:top-6 bottom-8 sm:bottom-10 flex flex-col justify-between text-xs text-muted-foreground select-none">
                   {yAxisLabels.slice().reverse().map((label) => (
                     <span key={`yl-${label}`}>{label}</span>
                   ))}
                 </div>
                 {/* Y axis line */}
-                <div className="absolute left-12 top-6 bottom-10 w-px bg-gray-200" />
+                <div className="absolute left-8 sm:left-12 top-4 sm:top-6 bottom-8 sm:bottom-10 w-px bg-gray-200" />
 
-                <div className="flex items-end h-72 space-x-2 pl-12 pr-2">
+                <div className="flex items-end h-48 sm:h-72 space-x-1 sm:space-x-2 pl-8 sm:pl-12 pr-1 sm:pr-2">
                   {/* Bars */}
-                  <div className="flex-1 flex items-end space-x-2">
+                  <div className="flex-1 flex items-end space-x-1 sm:space-x-2">
                     {monthlyChartData.map((m) => {
                       const height = roundedMax > 0 ? (m.clicks / roundedMax) * 100 : 0;
                       const barHeight = Math.max(height, m.clicks > 0 ? 2 : 0);
                       return (
                         <div key={m.date} className="flex-1 flex flex-col items-center">
                           <div
-                            className="w-full bg-rose-300 border-2 border-rose-500 rounded-t-lg"
-                            style={{ height: `${barHeight}%`, minHeight: '6px' }}
+                            className="w-full bg-rose-300 border border-rose-500 sm:border-2 rounded-t-lg"
+                            style={{ height: `${barHeight}%`, minHeight: '4px' }}
                           />
-                          <div className="text-xs text-muted-foreground mt-2">{m.date}</div>
+                          <div className="text-xs text-muted-foreground mt-1 sm:mt-2 text-center">{m.date}</div>
                         </div>
                       );
                     })}
@@ -445,26 +446,27 @@ const Statistics = () => {
         </Card>
 
         {/* Recent Activity */}
-        <Card className="p-6 lg:col-span-1">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Recent Activity</h2>
+        <Card className="p-4 sm:p-6 lg:col-span-1">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 sm:gap-0">
+            <h2 className="text-lg sm:text-xl font-semibold">Recent Activity</h2>
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => setShowViewAllModal(true)}
+              className="w-full sm:w-auto"
             >
-              View all
+              <span className="text-sm">View all</span>
             </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {recentActivity.length > 0 ? (
               recentActivity.map((activity, index) => (
-                <div key={activity.id || index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">
+                <div key={activity.id || index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-muted/50 rounded-lg gap-2 sm:gap-0">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <span className="text-xs sm:text-sm font-medium truncate">
                         {activity.city && activity.country ? 
                           `${activity.city}, ${activity.country}` : 
                           activity.country || 'Unknown Location'
@@ -472,24 +474,27 @@ const Statistics = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                  <div className="flex items-center flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                     <div className="flex items-center space-x-1">
                       <Monitor className="w-3 h-3" />
-                      <span>{activity.device_type || 'Unknown'}</span>
+                      <span className="hidden sm:inline">{activity.device_type || 'Unknown'}</span>
+                      <span className="sm:hidden">{(activity.device_type || 'Unknown').substring(0, 3)}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Chrome className="w-3 h-3" />
-                      <span>{activity.browser || 'Unknown'}</span>
+                      <span className="hidden sm:inline">{activity.browser || 'Unknown'}</span>
+                      <span className="sm:hidden">{(activity.browser || 'Unknown').substring(0, 3)}</span>
                     </div>
                     {activity.referer && (
                       <div className="flex items-center space-x-1">
                         <Globe className="w-3 h-3" />
-                        <span className="truncate max-w-[100px]">{activity.referer}</span>
+                        <span className="truncate max-w-[80px] sm:max-w-[100px] text-xs">{activity.referer}</span>
                       </div>
                     )}
                     <div className="flex items-center space-x-1">
                       <User className="w-3 h-3" />
-                      <span>{activity.os || 'Unknown'}</span>
+                      <span className="hidden sm:inline">{activity.os || 'Unknown'}</span>
+                      <span className="sm:hidden">{(activity.os || 'Unknown').substring(0, 3)}</span>
                     </div>
                   </div>
                 </div>
