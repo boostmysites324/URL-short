@@ -596,27 +596,111 @@ const Statistics = () => {
                 <div key={activity.id || index} className="p-4 bg-white border rounded-lg hover:shadow-sm transition">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-lg">{getFlagEmoji(activity.country, activity.country_name)}</span>
+                      <div className="flex items-center gap-1.5">
+                        {activity.source_platform && activity.source_platform !== 'Direct' && (() => {
+                          const platform = activity.source_platform.toLowerCase();
+                          if (platform.includes('whatsapp')) {
+                            return (
+                              <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                WA
+                              </div>
+                            );
+                          } else if (platform.includes('facebook')) {
+                            return (
+                              <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                FB
+                              </div>
+                            );
+                          } else if (platform.includes('twitter') || platform.includes('x')) {
+                            return (
+                              <div className="w-7 h-7 rounded-full bg-black flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                X
+                              </div>
+                            );
+                          } else if (platform.includes('instagram')) {
+                            return (
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                IG
+                              </div>
+                            );
+                          } else if (platform.includes('telegram')) {
+                            return (
+                              <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                TG
+                              </div>
+                            );
+                          } else if (platform.includes('linkedin')) {
+                            return (
+                              <div className="w-7 h-7 rounded-full bg-blue-700 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                LI
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        <span className="text-lg">{getFlagEmoji(activity.country, activity.country_name)}</span>
+                      </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold truncate">
                           {activity.city && activity.city !== 'Unknown' ? `${activity.city}, ` : ''}{activity.country_name || (activity.country ? activity.country : 'Unknown')}
                         </div>
                         <div className="text-[11px] text-muted-foreground">{(() => { const t = new Date(activity.clicked_at || activity.created_at); const diff = Math.floor((Date.now() - t.getTime())/60000); return diff < 60 ? `${diff} minutes ago` : `${Math.floor(diff/60)} hours ago`; })()}</div>
-                        {activity.referer && activity.referer !== 'Direct' && (
-                          <div className="flex items-center gap-1 text-xs text-primary truncate mt-1">
-                            <Globe className="w-3 h-3" />
-                            <span className="font-medium truncate max-w-[220px] sm:max-w-[360px]">
-                              From: {(() => {
-                                try {
-                                  const url = new URL(activity.referer);
-                                  return url.hostname.replace('www.', '');
-                                } catch {
-                                  return activity.referer;
-                                }
-                              })()}
-                            </span>
-                          </div>
-                        )}
+                        {(() => {
+                          // Get the embedded website from referer
+                          let embeddedWebsite = null;
+                          let isOurDomain = false;
+                          
+                          if (activity.referer && activity.referer !== 'Direct') {
+                            try {
+                              const url = new URL(activity.referer);
+                              const hostname = url.hostname.replace('www.', '').replace('m.', '');
+                              
+                              // Check if it's our own domain
+                              if (hostname.includes('vercel.app') || 
+                                  hostname.includes('swift-link') || 
+                                  hostname.includes('247l.ink') ||
+                                  hostname.includes('localhost')) {
+                                isOurDomain = true;
+                              } else {
+                                embeddedWebsite = hostname;
+                              }
+                            } catch {
+                              embeddedWebsite = activity.referer;
+                            }
+                          }
+                          
+                          // Show platform AND embedded website (like b2u.io)
+                          const platform = activity.source_platform && activity.source_platform !== 'Direct' 
+                            ? activity.source_platform 
+                            : null;
+                          
+                          // If we have platform or embedded website, show them
+                          if (platform || embeddedWebsite) {
+                            return (
+                              <div className="flex items-center gap-2 text-xs truncate mt-1">
+                                {platform && (
+                                  <div className="flex items-center gap-1 text-green-600">
+                                    <Share2 className="w-3 h-3" />
+                                    <span className="font-semibold">{platform}</span>
+                                  </div>
+                                )}
+                                {platform && embeddedWebsite && (
+                                  <span className="text-muted-foreground">•</span>
+                                )}
+                                {embeddedWebsite && (
+                                  <div className="flex items-center gap-1 text-primary">
+                                    <Globe className="w-3 h-3" />
+                                    <span className="font-medium truncate max-w-[180px] sm:max-w-[280px]">
+                                      {embeddedWebsite}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          
+                          return null;
+                        })()}
                         {(activity.destination_url || selectedLink?.original_url) && (
                           <div className="flex items-center gap-1 text-xs truncate mt-1">
                             <ExternalLink className="w-3 h-3 text-primary" />
