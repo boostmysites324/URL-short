@@ -219,7 +219,128 @@ serve(async (req) => {
 
     // Parse user agent for device/browser info
     const userAgent = req.headers.get('user-agent') || '';
-    const referer = req.headers.get('referer') || 'Direct';
+    const referer = req.headers.get('referer') || '';
+    
+    // Detect source platform (where the link was shared/opened from)
+    // Priority: 1) User Agent, 2) Referer Header, 3) UTM Parameter, 4) Direct
+    // For unknown platforms: Shows the actual domain name from referer
+    let sourcePlatform = 'Direct';
+    const userAgentLower = userAgent.toLowerCase();
+    const refererLower = referer.toLowerCase();
+    
+    // Check user agent for messaging apps and social platforms
+    if (userAgentLower.includes('whatsapp')) {
+      sourcePlatform = 'WhatsApp';
+    } else if (userAgentLower.includes('telegram')) {
+      sourcePlatform = 'Telegram';
+    } else if (userAgentLower.includes('facebook') || userAgentLower.includes('fbios') || userAgentLower.includes('fban')) {
+      sourcePlatform = 'Facebook';
+    } else if (userAgentLower.includes('twitter') || userAgentLower.includes('tweetie')) {
+      sourcePlatform = 'Twitter';
+    } else if (userAgentLower.includes('instagram')) {
+      sourcePlatform = 'Instagram';
+    } else if (userAgentLower.includes('linkedin')) {
+      sourcePlatform = 'LinkedIn';
+    } else if (userAgentLower.includes('pinterest')) {
+      sourcePlatform = 'Pinterest';
+    } else if (userAgentLower.includes('reddit')) {
+      sourcePlatform = 'Reddit';
+    } else if (userAgentLower.includes('snapchat')) {
+      sourcePlatform = 'Snapchat';
+    } else if (userAgentLower.includes('tiktok')) {
+      sourcePlatform = 'TikTok';
+    } else if (userAgentLower.includes('wechat')) {
+      sourcePlatform = 'WeChat';
+    } else if (userAgentLower.includes('line')) {
+      sourcePlatform = 'Line';
+    } else if (userAgentLower.includes('viber')) {
+      sourcePlatform = 'Viber';
+    } else if (userAgentLower.includes('skype')) {
+      sourcePlatform = 'Skype';
+    } else if (userAgentLower.includes('discord')) {
+      sourcePlatform = 'Discord';
+    } else if (userAgentLower.includes('slack')) {
+      sourcePlatform = 'Slack';
+    } else if (userAgentLower.includes('messenger')) {
+      sourcePlatform = 'Messenger';
+    } else if (referer) {
+      // Check referer header for social media sites
+      try {
+        const refererUrl = new URL(referer);
+        const refererHost = refererUrl.hostname.toLowerCase();
+        
+        if (refererHost.includes('facebook.com') || refererHost.includes('fb.com')) {
+          sourcePlatform = 'Facebook';
+        } else if (refererHost.includes('twitter.com') || refererHost.includes('x.com')) {
+          sourcePlatform = 'Twitter';
+        } else if (refererHost.includes('instagram.com')) {
+          sourcePlatform = 'Instagram';
+        } else if (refererHost.includes('linkedin.com')) {
+          sourcePlatform = 'LinkedIn';
+        } else if (refererHost.includes('pinterest.com')) {
+          sourcePlatform = 'Pinterest';
+        } else if (refererHost.includes('reddit.com')) {
+          sourcePlatform = 'Reddit';
+        } else if (refererHost.includes('tiktok.com')) {
+          sourcePlatform = 'TikTok';
+        } else if (refererHost.includes('youtube.com') || refererHost.includes('youtu.be')) {
+          sourcePlatform = 'YouTube';
+        } else if (refererHost.includes('whatsapp.com') || refererHost.includes('wa.me')) {
+          sourcePlatform = 'WhatsApp';
+        } else if (refererHost.includes('t.me')) {
+          sourcePlatform = 'Telegram';
+        } else if (refererHost.includes('snapchat.com')) {
+          sourcePlatform = 'Snapchat';
+        } else if (refererHost.includes('discord.com')) {
+          sourcePlatform = 'Discord';
+        } else if (refererHost.includes('slack.com')) {
+          sourcePlatform = 'Slack';
+        } else if (refererHost.includes('messenger.com')) {
+          sourcePlatform = 'Messenger';
+        } else if (refererHost && refererHost !== '') {
+          // For unknown platforms, show the actual domain name
+          // Remove www. and common prefixes, but keep the full domain
+          let cleanHost = refererHost.replace('www.', '').replace('m.', '');
+          
+          // If it's a well-known domain pattern, extract the main domain
+          // e.g., "subdomain.example.com" -> "example.com"
+          const parts = cleanHost.split('.');
+          if (parts.length > 2) {
+            // Take last two parts (domain + TLD)
+            cleanHost = parts.slice(-2).join('.');
+          }
+          
+          // Capitalize first letter and use full domain
+          sourcePlatform = cleanHost.charAt(0).toUpperCase() + cleanHost.slice(1);
+        }
+      } catch (e) {
+        // If referer is not a valid URL, check if it's a non-URL string
+        if (referer && referer.trim() !== '') {
+          // Use the referer as-is if it's not a valid URL but has content
+          sourcePlatform = referer.length > 30 ? referer.substring(0, 30) + '...' : referer;
+        } else {
+          sourcePlatform = 'Direct';
+        }
+      }
+    }
+    
+    // Check for UTM source parameter in the request URL
+    try {
+      const requestUrl = new URL(req.url);
+      const utmSource = requestUrl.searchParams.get('utm_source');
+      if (utmSource) {
+        // Capitalize first letter
+        sourcePlatform = utmSource.charAt(0).toUpperCase() + utmSource.slice(1).toLowerCase();
+      }
+    } catch (e) {
+      // Ignore URL parsing errors
+    }
+    
+    console.log('📱 Source Platform Detection:', {
+      userAgent: userAgent.substring(0, 50),
+      referer: referer.substring(0, 50),
+      detectedSource: sourcePlatform
+    });
     
     // Simple user agent parsing
     let deviceType = 'desktop';
@@ -263,7 +384,8 @@ serve(async (req) => {
           link_id: link.id,
           ip_address: normalizedIP,
           user_agent: userAgent,
-          referer: referer,
+          referer: referer || 'Direct',
+          source_platform: sourcePlatform, // Track where link was shared/opened from
           country: geoData.country,
           country_name: geoData.country_name,
           city: geoData.city,

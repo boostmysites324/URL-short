@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, ExternalLink, Calendar, MapPin, Globe, Monitor, Chrome, User, RefreshCw, Home, Shuffle, Smartphone, Apple } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Calendar, MapPin, Globe, Monitor, Chrome, User, RefreshCw, Home, Shuffle, Smartphone, Apple, Share2 } from 'lucide-react';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useLinks } from '@/hooks/useLinks';
 import { useToast } from '@/hooks/use-toast';
@@ -126,7 +126,7 @@ const Statistics = () => {
         // Calculate summary metrics for selected range
         const { data: allClicksData, error: allClicksError } = await supabase
           .from('clicks')
-          .select('id, ip_address, created_at, referer, country, country_name')
+          .select('id, ip_address, created_at, referer, country, country_name, source_platform')
           .eq('link_id', selectedLink.id)
           .gte('created_at', startDate.toISOString())
           .lte('created_at', endDate.toISOString());
@@ -154,10 +154,11 @@ const Statistics = () => {
           uniqueIPsCount: uniqueIPs.size
         });
         
-        // Get top country and top referrer from all clicks in range (more accurate)
+        // Get top country, top referrer, and top source platform from all clicks in range (more accurate)
         const countryCounts: { [key: string]: number } = {};
         const referrerCounts: { [key: string]: number } = {};
         const destinationCounts: { [key: string]: number } = {};
+        const sourcePlatformCounts: { [key: string]: number } = {};
         (allClicksData || []).forEach((click: any) => {
           const countryKey = click.country_name || click.country || 'Unknown';
           countryCounts[countryKey] = (countryCounts[countryKey] || 0) + 1;
@@ -165,6 +166,9 @@ const Statistics = () => {
           referrerCounts[ref] = (referrerCounts[ref] || 0) + 1;
           const destUrl = (click.destination_url || selectedLink.original_url || '').toString();
           if (destUrl) destinationCounts[destUrl] = (destinationCounts[destUrl] || 0) + 1;
+          // Track source platform (where link was shared/opened from)
+          const sourcePlatform = click.source_platform || 'Direct';
+          sourcePlatformCounts[sourcePlatform] = (sourcePlatformCounts[sourcePlatform] || 0) + 1;
         });
         const topCountry = Object.keys(countryCounts).length
           ? Object.entries(countryCounts).sort((a,b) => b[1]-a[1])[0][0]
@@ -187,14 +191,17 @@ const Statistics = () => {
           if (!Object.keys(destinationCounts).length) return selectedLink.original_url;
           return Object.entries(destinationCounts).sort((a,b)=>b[1]-a[1])[0][0];
         })();
+        const topSourcePlatform = Object.keys(sourcePlatformCounts).length
+          ? Object.entries(sourcePlatformCounts).sort((a,b) => b[1]-a[1])[0][0]
+          : 'Direct';
 
         // Build per-day points for the selected range
         const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1);
         const chartData = Array.from({ length: totalDays }, (_, i) => {
           const d = startOfDay(addDays(startDate, i));
           const dateStr = format(d, 'yyyy-MM-dd');
-          const dayClicks = (allClicksData || []).filter(c => (c.created_at || '').startsWith(dateStr));
-          const dayUniqueIPs = new Set(dayClicks.map(c => c.ip_address).filter(Boolean));
+          const dayClicks = (allClicksData || []).filter((c: any) => (c.created_at || '').startsWith(dateStr));
+          const dayUniqueIPs = new Set(dayClicks.map((c: any) => c.ip_address).filter(Boolean));
           return { date: dateStr, clicks: dayClicks.length, unique: dayUniqueIPs.size };
         });
 
@@ -219,6 +226,7 @@ const Statistics = () => {
           topCountry,
           topReferrer: topDestination,
           topDestinationUrl: topDestinationUrlRaw,
+          topSourcePlatform,
           dailyData: dailyData || [],
           chartData
         });
@@ -375,7 +383,7 @@ const Statistics = () => {
         </Card>
 
         {/* Summary Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
           <Card className="p-4 sm:p-6 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
@@ -428,6 +436,20 @@ const Statistics = () => {
               </div>
               <div className="w-9 h-9 sm:w-12 sm:h-12 bg-indigo-100 rounded-full flex items-center justify-center">
                 <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-indigo-600" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4 sm:p-6 shadow-sm hover:shadow transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Top Source</p>
+                <p className="text-xs sm:text-sm font-semibold truncate max-w-[120px] sm:max-w-[150px]">
+                  {(linkAnalytics as any).topSourcePlatform || 'Direct'}
+                </p>
+              </div>
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <Share2 className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
               </div>
             </div>
           </Card>
@@ -580,10 +602,16 @@ const Statistics = () => {
                           {activity.city ? `${activity.city}, ` : ''}{activity.country_name || activity.country || 'Unknown'}
                         </div>
                         <div className="text-[11px] text-muted-foreground">{(() => { const t = new Date(activity.clicked_at || activity.created_at); const diff = Math.floor((Date.now() - t.getTime())/60000); return diff < 60 ? `${diff} minutes ago` : `${Math.floor(diff/60)} hours ago`; })()}</div>
-                        {activity.referer && (
+                        {activity.referer && activity.referer !== 'Direct' && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
                             <Globe className="w-3 h-3" />
                             <span className="truncate max-w-[220px] sm:max-w-[360px]">{activity.referer}</span>
+                          </div>
+                        )}
+                        {activity.source_platform && (
+                          <div className="flex items-center gap-1 text-xs text-primary truncate mt-1">
+                            <Share2 className="w-3 h-3" />
+                            <span className="font-medium">From: {activity.source_platform}</span>
                           </div>
                         )}
                         {(activity.destination_url || selectedLink?.original_url) && (
