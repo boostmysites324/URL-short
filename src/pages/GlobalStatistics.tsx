@@ -296,6 +296,54 @@ const GlobalStatistics = () => {
       </div>
 
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Header Card (matches per-link analytics header) */}
+        <div className="mb-4">
+          <div className="p-4 sm:p-5 bg-white rounded-xl border flex items-center gap-3 sm:gap-4 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-white border flex items-center justify-center">
+              {(() => {
+                // Pick top performing link to preview
+                const topLink = [...links].sort((a, b) => (b.total_clicks || 0) - (a.total_clicks || 0))[0];
+                const favDomain = (() => {
+                  try {
+                    return new URL(topLink?.original_url || topLink?.short_url || 'https://example.com').hostname;
+                  } catch {
+                    return 'example.com';
+                  }
+                })();
+                return (
+                  <img
+                    src={`https://www.google.com/s2/favicons?sz=64&domain=${favDomain}`}
+                    alt="favicon"
+                    className="w-6 h-6"
+                  />
+                );
+              })()}
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm sm:text-base font-medium text-slate-800 truncate">
+                {(() => {
+                  const topLink = [...links].sort((a, b) => (b.total_clicks || 0) - (a.total_clicks || 0))[0];
+                  return topLink?.short_url || 'All Links';
+                })()}
+              </div>
+              {(() => {
+                const topLink = [...links].sort((a, b) => (b.total_clicks || 0) - (a.total_clicks || 0))[0];
+                const dest = topLink?.original_url;
+                if (!dest) return null;
+                let host = dest;
+                try { host = new URL(dest).host; } catch {}
+                return (
+                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <ExternalLink className="w-3 h-3" />
+                    <a href={dest} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
+                      {host}
+                    </a>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
           <Card className="p-3 sm:p-6">

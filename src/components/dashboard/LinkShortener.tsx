@@ -10,11 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe, Share, BarChart3, Edit, Archive, Eye, QrCode, Download, RotateCcw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Copy, Link as LinkIcon, Settings, ExternalLink, Sparkles, Clock, Check, Search, MoreHorizontal, Calendar, Lock, Globe, Share, BarChart3, Edit, Archive, Eye, QrCode, Download, RotateCcw, Trash2, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { useLinks } from "@/hooks/useLinks";
+import { useLinks, formatTimeAgo } from "@/hooks/useLinks";
 import { useDomains } from "@/hooks/useDomains";
 import { useChannels } from "@/hooks/useChannels";
 import { useCampaigns } from "@/hooks/useCampaigns";
@@ -70,9 +70,25 @@ const LinkShortener = () => {
   } | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editLink, setEditLink] = useState<any>(null);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const { toast } = useToast();
   const { links, loading, shortenUrl, refreshLinks, page, hasMore, nextPage, prevPage } = useLinks();
+
+  // Track when data was last updated
+  useEffect(() => {
+    setLastUpdateTime(new Date());
+    setIsUpdating(false);
+  }, [links]);
+
+  // Show updating state briefly when refreshing
+  const handleRefresh = () => {
+    setIsUpdating(true);
+    refreshLinks();
+    setLastUpdateTime(new Date());
+    setTimeout(() => setIsUpdating(false), 1000);
+  };
   const { domains } = useDomains();
   const { channels } = useChannels();
   const { campaigns } = useCampaigns();
@@ -771,6 +787,14 @@ const LinkShortener = () => {
             <div>
               <h3 className="text-lg sm:text-xl font-bold text-card-foreground">Recent Links</h3>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage and track your shortened URLs</p>
+              {lastUpdateTime && (
+                <div className="flex items-center space-x-1 mt-1">
+                  <RefreshCw className={`w-3 h-3 ${isUpdating ? 'text-blue-500 animate-spin' : 'text-green-500'}`} />
+                  <span className={`text-xs font-medium ${isUpdating ? 'text-blue-600' : 'text-green-600'}`}>
+                    {isUpdating ? 'Updating...' : 'Live data'} • Updated {formatTimeAgo(lastUpdateTime.toISOString())}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <div className="relative flex-1 sm:flex-none">
@@ -782,6 +806,16 @@ const LinkShortener = () => {
                   className="pl-10 w-full sm:w-64"
                 />
               </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRefresh}
+                className="hover-lift flex-shrink-0"
+                title="Refresh data"
+                disabled={isUpdating}
+              >
+                <RefreshCw className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+              </Button>
               <Button variant="ghost" size="sm" className="hover-lift flex-shrink-0">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
@@ -886,16 +920,32 @@ const LinkShortener = () => {
                             </div>
                           )}
                           
-                          <div className="flex items-center space-x-6 mt-3">
-                            <div className="flex items-center space-x-1">
-                              <div className="w-2 h-2 bg-primary rounded-full"></div>
-                              <span className="text-sm font-medium text-card-foreground">{link.total_clicks || 0}</span>
-                              <span className="text-xs text-muted-foreground">Total Clicks</span>
+                          <div className="mt-3 space-y-2">
+                            {/* Main click statistics */}
+                            <div className="flex items-center space-x-6">
+                              <div className="flex items-center space-x-1">
+                                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                <span className="text-sm font-medium text-card-foreground">{link.total_clicks || 0}</span>
+                                <span className="text-xs text-muted-foreground">Total Clicks</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <div className="w-2 h-2 bg-success rounded-full"></div>
+                                <span className="text-sm font-medium text-card-foreground">{link.unique_clicks || 0}</span>
+                                <span className="text-xs text-muted-foreground">Unique</span>
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <div className="w-2 h-2 bg-success rounded-full"></div>
-                              <span className="text-sm font-medium text-card-foreground">{link.unique_clicks || 0}</span>
-                              <span className="text-xs text-muted-foreground">Unique</span>
+                            
+                            {/* Detailed click statistics */}
+                            <div className="text-xs text-muted-foreground transition-all duration-300 hover:scale-105">
+                              <span className="font-medium text-primary transition-colors duration-200">{link.total_clicks || 0} Clicks</span>
+                              <span className="mx-2">-</span>
+                              <span className="font-medium text-success transition-colors duration-200">{link.unique_clicks || 0} Unique Clicks</span>
+                              <span className="mx-2">-</span>
+                              <span className="font-medium text-orange-600 transition-colors duration-200">{formatTimeAgo(link.last_click_time)}</span>
+                              <span className="mx-2">-</span>
+                              <span className="font-medium text-blue-600 transition-colors duration-200">{link.yesterday_clicks || 0} Yesterday Clicks</span>
+                              <span className="mx-2">-</span>
+                              <span className="font-medium text-green-600 transition-colors duration-200">{link.today_clicks || 0} Today Clicks</span>
                             </div>
                           </div>
                         </div>

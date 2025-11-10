@@ -272,6 +272,8 @@ serve(async (req) => {
           os: os,
           device_type: deviceType,
           is_unique: isUnique,
+          // store the destination at the moment of the click so edits later won't rewrite history
+          destination_url: link.original_url,
           fingerprint: `${normalizedIP}-${userAgent.slice(0, 50)}`
         });
 

@@ -4,16 +4,21 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, ExternalLink, Calendar, MapPin, Globe, Monitor, Chrome, User, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Calendar, MapPin, Globe, Monitor, Chrome, User, RefreshCw, Home, Shuffle, Smartphone, Apple } from 'lucide-react';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useLinks } from '@/hooks/useLinks';
 import { useToast } from '@/hooks/use-toast';
-import { format, subDays, startOfDay, endOfDay, subMonths } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, subMonths, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import WorldMap from '@/components/analytics/WorldMap';
 import ViewAllActivityModal from '@/components/analytics/ViewAllActivityModal';
 import PlatformsAnalytics from '@/components/analytics/PlatformsAnalytics';
 import BrowserAnalytics from '@/components/analytics/BrowserAnalytics';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { Globe2, MapPin as MapPinIcon } from 'lucide-react';
+import DailyClicksChart from '@/components/analytics/DailyClicksChart';
 
 const Statistics = () => {
   const { linkId } = useParams<{ linkId: string }>();
@@ -27,6 +32,28 @@ const Statistics = () => {
   const [activeTab, setActiveTab] = useState('summary');
   const [showViewAllModal, setShowViewAllModal] = useState(false);
   const [allLinkClicks, setAllLinkClicks] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
+    from: subDays(new Date(), 14),
+    to: new Date()
+  }));
+
+  // Helpers
+  const getFlagEmoji = (country?: string, countryName?: string) => {
+    const name = (countryName || '').toLowerCase();
+    if (name === 'india') return '🇮🇳';
+    const code = (country || '').toUpperCase();
+    if (code.length === 2) {
+      const A = 127462; // regional indicator A
+      const Z = 127487;
+      const base = 127397; // offset
+      const first = code.codePointAt(0) || 65;
+      const second = code.codePointAt(1) || 65;
+      if (first >= 65 && first <= 90 && second >= 65 && second <= 90) {
+        return String.fromCodePoint(base + first, base + second);
+      }
+    }
+    return '🌍';
+  };
 
   // Statistics page loaded
 
@@ -55,9 +82,9 @@ const Statistics = () => {
       try {
         setLoading(true);
         
-        // Calculate date range (last 10 days)
-        const endDate = new Date();
-        const startDate = subDays(endDate, 9);
+        // Use selected date range (inclusive)
+        const startDate = startOfDay(dateRange.from);
+        const endDate = endOfDay(dateRange.to);
         
         // Fetch daily analytics for this specific link
         const { data: dailyData, error: dailyError } = await supabase
@@ -78,29 +105,46 @@ const Statistics = () => {
 
         if (dailyError) throw dailyError;
 
-        // Fetch recent clicks for this link
+        // Fetch recent clicks for this link with destination_url for historical accuracy
+        // The destination_url field stores the URL that was actually clicked at the time
         const { data: clicksData, error: clicksError } = await supabase
           .from('clicks')
           .select('*')
           .eq('link_id', selectedLink.id)
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString())
           .order('created_at', { ascending: false })
           .limit(10);
 
-        if (clicksError) throw clicksError;
+        if (clicksError) {
+          console.error('Error fetching clicks:', clicksError);
+          throw clicksError;
+        }
+        
+        console.log('Recent clicks data:', clicksData);
 
-        // Calculate summary metrics from actual clicks table (not analytics_daily)
+        // Calculate summary metrics for selected range
         const { data: allClicksData, error: allClicksError } = await supabase
           .from('clicks')
-          .select('id, ip_address, created_at')
-          .eq('link_id', selectedLink.id);
+          .select('id, ip_address, created_at, referer, country, country_name')
+          .eq('link_id', selectedLink.id)
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString());
 
         if (allClicksError) throw allClicksError;
 
-        // Calculate total clicks from actual clicks table
-        let totalClicks = allClicksData?.length || 0;
+        // Also fetch ALL-TIME clicks for card parity with outside list
+        const { data: allTimeClicks, error: allTimeError } = await supabase
+          .from('clicks')
+          .select('id, ip_address')
+          .eq('link_id', selectedLink.id);
+        if (allTimeError) throw allTimeError;
+
+        // Calculate totals
+        let totalClicks = allTimeClicks?.length || 0;
         
         // Calculate unique clicks based on IP address
-        const uniqueIPs = new Set(allClicksData?.map(click => click.ip_address).filter(Boolean) || []);
+        const uniqueIPs = new Set((allTimeClicks || []).map((click: any) => click.ip_address).filter(Boolean) || []);
         let uniqueClicks = uniqueIPs.size;
 
         console.log('Statistics - Click counts from actual clicks table:', {
@@ -110,44 +154,48 @@ const Statistics = () => {
           uniqueIPsCount: uniqueIPs.size
         });
         
-        // Get top country and referrer from recent clicks
+        // Get top country and top referrer from all clicks in range (more accurate)
         const countryCounts: { [key: string]: number } = {};
         const referrerCounts: { [key: string]: number } = {};
-        
-        clicksData?.forEach(click => {
-          if (click.country) {
-            countryCounts[click.country] = (countryCounts[click.country] || 0) + 1;
-          }
-          if (click.referer) {
-            referrerCounts[click.referer] = (referrerCounts[click.referer] || 0) + 1;
-          }
+        const destinationCounts: { [key: string]: number } = {};
+        (allClicksData || []).forEach((click: any) => {
+          const countryKey = click.country_name || click.country || 'Unknown';
+          countryCounts[countryKey] = (countryCounts[countryKey] || 0) + 1;
+          const ref = (click.referer && click.referer !== '') ? click.referer : 'Direct';
+          referrerCounts[ref] = (referrerCounts[ref] || 0) + 1;
+          const destUrl = (click.destination_url || selectedLink.original_url || '').toString();
+          if (destUrl) destinationCounts[destUrl] = (destinationCounts[destUrl] || 0) + 1;
         });
+        const topCountry = Object.keys(countryCounts).length
+          ? Object.entries(countryCounts).sort((a,b) => b[1]-a[1])[0][0]
+          : 'Unknown';
+        const topReferrerRaw = Object.keys(referrerCounts).length
+          ? Object.entries(referrerCounts).sort((a,b) => b[1]-a[1])[0][0]
+          : 'Direct';
+        const topReferrer = (() => {
+          if (topReferrerRaw === 'Direct') return 'Direct';
+          try { return new URL(topReferrerRaw).host; } catch { return topReferrerRaw; }
+        })();
+        const topDestination = (() => {
+          if (!Object.keys(destinationCounts).length) {
+            try { return new URL(selectedLink.original_url).host; } catch { return selectedLink.original_url; }
+          }
+          const top = Object.entries(destinationCounts).sort((a,b)=>b[1]-a[1])[0][0];
+          try { return new URL(top).host; } catch { return top; }
+        })();
+        const topDestinationUrlRaw = (() => {
+          if (!Object.keys(destinationCounts).length) return selectedLink.original_url;
+          return Object.entries(destinationCounts).sort((a,b)=>b[1]-a[1])[0][0];
+        })();
 
-        const topCountry = Object.keys(countryCounts).reduce((a, b) => 
-          countryCounts[a] > countryCounts[b] ? a : b, 'Unknown'
-        );
-        const topReferrer = Object.keys(referrerCounts).reduce((a, b) => 
-          referrerCounts[a] > referrerCounts[b] ? a : b, 'Direct'
-        );
-
-        // Create chart data from actual clicks (last 10 days)
-        const chartData = Array.from({ length: 10 }, (_, i) => {
-          const date = subDays(new Date(), 9 - i);
-          const dateStr = format(date, 'yyyy-MM-dd');
-          
-          // Count clicks for this specific date
-          const dayClicks = allClicksData?.filter(click => 
-            click.created_at.startsWith(dateStr)
-          ) || [];
-          
-          // Count unique clicks for this date
-          const dayUniqueIPs = new Set(dayClicks.map(click => click.ip_address).filter(Boolean));
-          
-          return {
-            date: dateStr,
-            clicks: dayClicks.length,
-            unique: dayUniqueIPs.size
-          };
+        // Build per-day points for the selected range
+        const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+        const chartData = Array.from({ length: totalDays }, (_, i) => {
+          const d = startOfDay(addDays(startDate, i));
+          const dateStr = format(d, 'yyyy-MM-dd');
+          const dayClicks = (allClicksData || []).filter(c => (c.created_at || '').startsWith(dateStr));
+          const dayUniqueIPs = new Set(dayClicks.map(c => c.ip_address).filter(Boolean));
+          return { date: dateStr, clicks: dayClicks.length, unique: dayUniqueIPs.size };
         });
 
         console.log('Statistics - Chart data from actual clicks:', {
@@ -169,7 +217,8 @@ const Statistics = () => {
           totalClicks,
           uniqueClicks,
           topCountry,
-          topReferrer,
+          topReferrer: topDestination,
+          topDestinationUrl: topDestinationUrlRaw,
           dailyData: dailyData || [],
           chartData
         });
@@ -218,7 +267,7 @@ const Statistics = () => {
         supabase.removeChannel(subscription);
       };
     }
-  }, [selectedLink, toast]);
+  }, [selectedLink, toast, dateRange]);
 
   if (loading) {
     return (
@@ -230,6 +279,7 @@ const Statistics = () => {
       </div>
     );
   }
+
 
   if (!selectedLink || !linkAnalytics) {
     return (
@@ -245,16 +295,12 @@ const Statistics = () => {
     );
   }
 
-  // Build last 12 months chart data from all clicks
-  const last12Months = Array.from({ length: 12 }, (_, i) => {
-    const d = subMonths(new Date(), 11 - i);
-    return { key: format(d, 'yyyy-MM'), label: format(d, 'LLLL') };
-  });
-  const monthlyChartData = last12Months.map((m) => {
-    const count = allLinkClicks.filter((c: any) => (c.created_at || '').startsWith(m.key)).length;
-    return { date: m.label, clicks: count };
-  });
-  const maxClicks = Math.max(...monthlyChartData.map(d => d.clicks), 0);
+  // Prepare daily chart for selected range
+  const dailyChartData = (linkAnalytics?.chartData || []).map((d: any) => ({
+    date: format(new Date(d.date), 'dd LLL'),
+    clicks: d.clicks
+  }));
+  const maxClicks = Math.max(...dailyChartData.map(d => d.clicks), 0);
   const roundedMax = Math.max(200, Math.ceil(maxClicks / 200) * 200);
   const yAxisLabels = Array.from({ length: roundedMax / 200 + 1 }, (_, i) => i * 200);
   
@@ -263,8 +309,8 @@ const Statistics = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+      <div className="border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="flex items-center space-x-3 sm:space-x-4">
               <Button variant="ghost" onClick={() => navigate('/')} className="flex-shrink-0">
@@ -272,7 +318,7 @@ const Statistics = () => {
                 <span className="hidden sm:inline">Back</span>
               </Button>
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl font-bold truncate">Link Analytics</h1>
+                <h1 className="text-xl sm:text-2xl font-bold truncate text-slate-900">Link Analytics</h1>
                 <div className="flex items-center space-x-2 mt-1">
                   <a 
                     href={selectedLink.short_url} 
@@ -291,48 +337,85 @@ const Statistics = () => {
       </div>
 
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* Link Header Card with favicon */}
+        <Card className="p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 rounded-full bg-white border flex items-center justify-center">
+            {/* Favicon based on original URL host if present */}
+            <img
+              src={`https://www.google.com/s2/favicons?sz=64&domain=${(() => {
+                try { return new URL(selectedLink.original_url || selectedLink.short_url).hostname; } catch { return 'example.com'; }
+              })()}`}
+              alt="favicon"
+              className="w-6 h-6"
+            />
+          </div>
+          <div className="min-w-0">
+            <a
+              href={selectedLink.short_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm sm:text-base font-medium text-slate-800 hover:underline truncate"
+            >
+              {selectedLink.short_url}
+            </a>
+            {linkAnalytics?.topReferrer && (
+              <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <ExternalLink className="w-3 h-3" />
+                <a
+                  href={(linkAnalytics as any).topDestinationUrl || selectedLink.original_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="truncate hover:underline"
+                >
+                  {linkAnalytics.topReferrer}
+                </a>
+              </div>
+            )}
+          </div>
+        </Card>
+
         {/* Summary Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="p-3 sm:p-6">
+          <Card className="p-4 sm:p-6 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">Clicks</p>
-                <p className="text-xl sm:text-3xl font-bold">{linkAnalytics.totalClicks}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900">{linkAnalytics.totalClicks}</p>
               </div>
-              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                <RefreshCw className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <RefreshCw className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-3 sm:p-6">
+          <Card className="p-4 sm:p-6 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">Unique Clicks</p>
-                <p className="text-xl sm:text-3xl font-bold">{linkAnalytics.uniqueClicks}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900">{linkAnalytics.uniqueClicks}</p>
               </div>
-              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-success/10 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 sm:w-6 sm:h-6 text-success" />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-600" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-3 sm:p-6">
+          <Card className="p-4 sm:p-6 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">Top Country</p>
-                <p className="text-sm sm:text-lg font-semibold flex items-center space-x-1 sm:space-x-2">
-                  <span className="text-lg sm:text-xl">🇮🇳</span>
+                <p className="text-sm sm:text-lg font-semibold flex items-center space-x-2">
+                  <span className="text-lg sm:text-xl">{getFlagEmoji(linkAnalytics.topCountry, linkAnalytics.topCountry)}</span>
                   <span className="truncate">{linkAnalytics.topCountry}</span>
                 </p>
               </div>
-              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <MapPin className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-3 sm:p-6">
+          <Card className="p-4 sm:p-6 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">Top Referrer</p>
@@ -343,29 +426,91 @@ const Statistics = () => {
                    linkAnalytics.topReferrer}
                 </p>
               </div>
-              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-indigo-600" />
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Main content grid (no tabs) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            {/* Clicks Section - Monthly chart and export */}
-            <Card className="p-4 sm:p-6 lg:col-span-2">
+        {/* Tabs row (visual navigation) */}
+        <div className="w-full bg-white border rounded-lg p-2 flex flex-wrap gap-2 items-center">
+          <Button variant="ghost" className="h-9 px-3 data-[active=true]:bg-slate-100" data-active>
+            <Home className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Summary</span>
+          </Button>
+          <Button variant="ghost" className="h-9 px-3">
+            <MapPin className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Countries & Cities</span>
+          </Button>
+          <Button variant="ghost" className="h-9 px-3">
+            <Monitor className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Platforms</span>
+          </Button>
+          <Button variant="ghost" className="h-9 px-3">
+            <Chrome className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Browsers</span>
+          </Button>
+          <Button variant="ghost" className="h-9 px-3">
+            <User className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Languages</span>
+          </Button>
+          <Button variant="ghost" className="h-9 px-3">
+            <Globe className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Referrers</span>
+          </Button>
+          <Button variant="ghost" className="h-9 px-3">
+            <Shuffle className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">A/B Testing</span>
+          </Button>
+          <div className="ml-auto" />
+        </div>
+
+        {/* Main content */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6">
+            {/* Clicks Section - Daily chart and export */}
+              <Card className="p-4 sm:p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3 sm:gap-0">
             <div>
               <h2 className="text-lg sm:text-xl font-semibold">Clicks</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground">Last 12 months</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {format(dateRange.from, 'MM/dd/yyyy')} - {format(dateRange.to, 'MM/dd/yyyy')}
+              </p>
             </div>
-            <Button 
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn('w-[240px] justify-start text-left font-normal')}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {format(dateRange.from, 'LLL dd, y')} - {format(dateRange.to, 'LLL dd, y')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <CalendarComponent
+                    initialFocus
+                    mode="range"
+                    numberOfMonths={2}
+                    selected={dateRange}
+                    onSelect={(range: any) => {
+                      if (range?.from && range?.to) {
+                        setDateRange({ from: range.from, to: range.to });
+                      }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button 
               onClick={async () => {
                 try {
                   const { data: clicksData, error } = await supabase
                     .from('clicks')
                     .select('*')
                     .eq('link_id', selectedLink.id)
+                    .gte('created_at', startOfDay(dateRange.from).toISOString())
+                    .lte('created_at', endOfDay(dateRange.to).toISOString())
                     .order('created_at', { ascending: false });
                   if (error) throw error;
                   if (!clicksData || clicksData.length === 0) return;
@@ -400,53 +545,17 @@ const Statistics = () => {
             >
               <span className="text-sm">Export Stats</span>
             </Button>
+            </div>
           </div>
 
-          {/* Monthly Bar Chart */}
-          <div className="space-y-3 sm:space-y-4">
-            {monthlyChartData.length > 0 ? (
-              <div className="relative bg-white rounded-lg p-3 sm:p-4 border border-card-border">
-                {/* Y axis labels */}
-                <div className="absolute left-1 sm:left-2 top-4 sm:top-6 bottom-8 sm:bottom-10 flex flex-col justify-between text-xs text-muted-foreground select-none">
-                  {yAxisLabels.slice().reverse().map((label) => (
-                    <span key={`yl-${label}`}>{label}</span>
-                  ))}
+                {/* Home-style dynamic chart */}
+                <div className="space-y-3 sm:space-y-4">
+                  <DailyClicksChart from={dateRange.from} to={dateRange.to} linkId={selectedLink.id} showMetrics={false} />
                 </div>
-                {/* Y axis line */}
-                <div className="absolute left-8 sm:left-12 top-4 sm:top-6 bottom-8 sm:bottom-10 w-px bg-gray-200" />
-
-                <div className="flex items-end h-48 sm:h-72 space-x-1 sm:space-x-2 pl-8 sm:pl-12 pr-1 sm:pr-2">
-                  {/* Bars */}
-                  <div className="flex-1 flex items-end space-x-1 sm:space-x-2">
-                    {monthlyChartData.map((m) => {
-                      const height = roundedMax > 0 ? (m.clicks / roundedMax) * 100 : 0;
-                      const barHeight = Math.max(height, m.clicks > 0 ? 2 : 0);
-                      return (
-                        <div key={m.date} className="flex-1 flex flex-col items-center">
-                          <div
-                            className="w-full bg-rose-300 border border-rose-500 sm:border-2 rounded-t-lg"
-                            style={{ height: `${barHeight}%`, minHeight: '4px' }}
-                          />
-                          <div className="text-xs text-muted-foreground mt-1 sm:mt-2 text-center">{m.date}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-64 bg-muted/20 rounded-lg">
-                <div className="text-center">
-                  <RefreshCw className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-muted-foreground">No data available</p>
-                </div>
-              </div>
-            )}
-          </div>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="p-4 sm:p-6 lg:col-span-1">
+              {/* Recent Activity - full width below chart */}
+              <Card className="p-4 sm:p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 sm:gap-0">
             <h2 className="text-lg sm:text-xl font-semibold">Recent Activity</h2>
             <Button 
@@ -462,39 +571,55 @@ const Statistics = () => {
           <div className="space-y-2 sm:space-y-3">
             {recentActivity.length > 0 ? (
               recentActivity.map((activity, index) => (
-                <div key={activity.id || index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-muted/50 rounded-lg gap-2 sm:gap-0">
-                  <div className="flex items-center space-x-3 sm:space-x-4">
-                    <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                    <div className="flex items-center space-x-2 min-w-0">
-                      <span className="text-xs sm:text-sm font-medium truncate">
-                        {activity.city && activity.country ? 
-                          `${activity.city}, ${activity.country}` : 
-                          activity.country || 'Unknown Location'
-                        }
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <Monitor className="w-3 h-3" />
-                      <span className="hidden sm:inline">{activity.device_type || 'Unknown'}</span>
-                      <span className="sm:hidden">{(activity.device_type || 'Unknown').substring(0, 3)}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Chrome className="w-3 h-3" />
-                      <span className="hidden sm:inline">{activity.browser || 'Unknown'}</span>
-                      <span className="sm:hidden">{(activity.browser || 'Unknown').substring(0, 3)}</span>
-                    </div>
-                    {activity.referer && (
-                      <div className="flex items-center space-x-1">
-                        <Globe className="w-3 h-3" />
-                        <span className="truncate max-w-[80px] sm:max-w-[100px] text-xs">{activity.referer}</span>
+                <div key={activity.id || index} className="p-4 bg-white border rounded-lg hover:shadow-sm transition">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-lg">{getFlagEmoji(activity.country, activity.country_name)}</span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate">
+                          {activity.city ? `${activity.city}, ` : ''}{activity.country_name || activity.country || 'Unknown'}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">{(() => { const t = new Date(activity.clicked_at || activity.created_at); const diff = Math.floor((Date.now() - t.getTime())/60000); return diff < 60 ? `${diff} minutes ago` : `${Math.floor(diff/60)} hours ago`; })()}</div>
+                        {activity.referer && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                            <Globe className="w-3 h-3" />
+                            <span className="truncate max-w-[220px] sm:max-w-[360px]">{activity.referer}</span>
+                          </div>
+                        )}
+                        {(activity.destination_url || selectedLink?.original_url) && (
+                          <div className="flex items-center gap-1 text-xs truncate mt-1">
+                            <ExternalLink className="w-3 h-3 text-primary" />
+                            <span className="text-muted-foreground">→</span>
+                            <a
+                              href={activity.destination_url || selectedLink.original_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate max-w-[200px] sm:max-w-[340px] text-primary hover:underline font-medium"
+                              title={`Clicked URL: ${activity.destination_url || selectedLink.original_url}`}
+                            >
+                              {(() => { 
+                                const url = activity.destination_url || selectedLink.original_url;
+                                try { return new URL(url).hostname; } catch { return url; } 
+                              })()}
+                            </a>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div className="flex items-center space-x-1">
-                      <User className="w-3 h-3" />
-                      <span className="hidden sm:inline">{activity.os || 'Unknown'}</span>
-                      <span className="sm:hidden">{(activity.os || 'Unknown').substring(0, 3)}</span>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        {String(activity.device_type || '').toLowerCase().includes('iphone') ? (
+                          <Apple className="w-3 h-3" />
+                        ) : String(activity.device_type || '').toLowerCase().includes('android') ? (
+                          <Smartphone className="w-3 h-3 text-green-600" />
+                        ) : (
+                          <Monitor className="w-3 h-3" />
+                        )}
+                        <span className="capitalize">{activity.device_type || 'unknown'}</span>
+                      </div>
+                      <div className="flex items-center gap-1"><Chrome className="w-3 h-3" /><span>{activity.browser || 'Unknown'}</span></div>
+                      <div className="flex items-center gap-1"><User className="w-3 h-3" /><span>{activity.os || 'Unknown'}</span></div>
+                      <div className="flex items-center gap-1"><span className="px-1 rounded border text-[10px]">A</span><span>{activity.language || 'English'}</span></div>
                     </div>
                   </div>
                 </div>

@@ -466,7 +466,7 @@ const ViewAllActivityModal = ({ isOpen, onClose, linkId, linkUrl }: ViewAllActiv
                       </div>
                       {activity.links && (
                         <div className="text-sm text-muted-foreground">
-                          <span className="font-mono">{activity.links.original_url}</span>
+                          <span className="font-mono">{(activity as any).destination_url || activity.links.original_url}</span>
                         </div>
                       )}
                     </div>

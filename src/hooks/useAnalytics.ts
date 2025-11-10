@@ -57,41 +57,68 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
       const today = new Date().toISOString().split('T')[0];
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
-      // Calculate date range for current period
+      // Calculate date range for current period - make it more flexible
       const periodStart = startDate ? startDate.toISOString().split('T')[0] : 
-                         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                         new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 90 days instead of 30
       const periodEnd = endDate ? endDate.toISOString().split('T')[0] : today;
 
       console.log('Fetching analytics for user:', user.id);
+
+      // First, let's check if user has any links at all
+      const { data: userLinks, error: linksError } = await supabase
+        .from('links')
+        .select('id, short_code, user_id')
+        .eq('user_id', user.id);
+
+      console.log('📊 User links:', userLinks);
+      if (linksError) {
+        console.error('❌ Error fetching user links:', linksError);
+      }
 
       // Get total clicks (all time) for user's links from actual clicks table
       const { data: totalClicksData, error: totalError } = await supabase
         .from('clicks')
         .select(`
           id,
+          created_at,
           links!inner(
             user_id
           )
         `)
         .eq('links.user_id', user.id);
 
-      if (totalError) throw totalError;
+      if (totalError) {
+        console.error('❌ Error fetching total clicks:', totalError);
+        throw totalError;
+      }
 
+      console.log('📊 Total clicks data:', totalClicksData);
       const totalClicks = totalClicksData?.length || 0;
+
+      // Let's also check if there are ANY clicks in the database at all
+      const { data: allClicks, error: allClicksError } = await supabase
+        .from('clicks')
+        .select('id, created_at, link_id')
+        .limit(10);
+        
+      console.log('📊 Sample clicks from database (any user):', allClicks);
+      if (allClicksError) {
+        console.error('❌ Error fetching sample clicks:', allClicksError);
+      }
 
       // Get current period clicks for user's links from actual clicks table
       const { data: periodClicksData, error: periodError } = await supabase
         .from('clicks')
         .select(`
           id,
-          clicked_at,
+          created_at,
           links!inner(
             user_id
           )
         `)
         .eq('links.user_id', user.id)
-        .gte('clicked_at', `${periodStart}T00:00:00.000Z`)
-        .lte('clicked_at', `${periodEnd}T23:59:59.999Z`);
+        .gte('created_at', `${periodStart}T00:00:00.000Z`)
+        .lte('created_at', `${periodEnd}T23:59:59.999Z`);
 
       if (periodError) throw periodError;
 
@@ -102,24 +129,30 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
         .from('clicks')
         .select(`
           id,
-          clicked_at,
+          created_at,
           links!inner(
             user_id
           )
         `)
         .eq('links.user_id', user.id)
-        .gte('clicked_at', `${today}T00:00:00.000Z`)
-        .lte('clicked_at', `${today}T23:59:59.999Z`);
+        .gte('created_at', `${today}T00:00:00.000Z`)
+        .lte('created_at', `${today}T23:59:59.999Z`);
 
       if (todayError) throw todayError;
 
       const todayClicks = todayClicksData?.length || 0;
 
       // Get chart data for the selected period for user's links with URL breakdown from actual clicks table
-      const { data: chartData, error: chartError } = await supabase
+      console.log('📊 Fetching chart data with filters:', {
+        periodStart,
+        periodEnd,
+        userId: user.id
+      });
+      
+      let { data: chartData, error: chartError } = await supabase
         .from('clicks')
         .select(`
-          clicked_at,
+          created_at,
           links!inner(
             user_id,
             short_code,
@@ -127,16 +160,73 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
           )
         `)
         .eq('links.user_id', user.id)
-        .gte('clicked_at', `${periodStart}T00:00:00.000Z`)
-        .lte('clicked_at', `${periodEnd}T23:59:59.999Z`)
-        .order('clicked_at', { ascending: true });
+        .gte('created_at', `${periodStart}T00:00:00.000Z`)
+        .lte('created_at', `${periodEnd}T23:59:59.999Z`)
+        .order('created_at', { ascending: true });
 
-      if (chartError) throw chartError;
+      if (chartError) {
+        console.error('❌ Chart data error:', chartError);
+        throw chartError;
+      }
+      
+      console.log('📊 Raw chart data from database:', chartData);
+
+      // If no data with inner join, try a different approach
+      if (!chartData || chartData.length === 0) {
+        console.log('📊 No data with inner join, trying alternative approach...');
+        
+        // Get all clicks for user's link IDs
+        const userLinkIds = userLinks?.map(link => link.id) || [];
+        console.log('📊 User link IDs:', userLinkIds);
+        
+        if (userLinkIds.length > 0) {
+          const { data: altChartData, error: altError } = await supabase
+            .from('clicks')
+            .select('created_at, link_id')
+            .in('link_id', userLinkIds)
+            .gte('created_at', `${periodStart}T00:00:00.000Z`)
+            .lte('created_at', `${periodEnd}T23:59:59.999Z`)
+            .order('created_at', { ascending: true });
+            
+          if (altError) {
+            console.error('❌ Alternative chart data error:', altError);
+          } else {
+            console.log('📊 Alternative chart data:', altChartData);
+            // Use alternative data if available
+            if (altChartData && altChartData.length > 0) {
+              chartData = altChartData.map(click => ({
+                created_at: click.created_at,
+                links: userLinks?.find(l => l.id === click.link_id)
+              }));
+            } else {
+              // If still no data, try without date filters
+              console.log('📊 No data with date filters, trying all clicks...');
+              const { data: allClicksData, error: allClicksError } = await supabase
+                .from('clicks')
+                .select('created_at, link_id')
+                .in('link_id', userLinkIds)
+                .order('created_at', { ascending: true });
+                
+              if (!allClicksError && allClicksData && allClicksData.length > 0) {
+                console.log('📊 All clicks data:', allClicksData);
+                chartData = allClicksData.map(click => ({
+                  created_at: click.created_at,
+                  links: userLinks?.find(l => l.id === click.link_id)
+                }));
+              }
+            }
+          }
+        }
+      }
 
       // Process chart data with URL breakdown from actual clicks
       const processedChartData = chartData?.reduce((acc, click) => {
-        const date = click.clicked_at.split('T')[0];
+        // Use UTC date to avoid timezone issues
+        const clickDate = new Date(click.created_at);
+        const date = clickDate.toISOString().split('T')[0];
         const existingDay = acc.find(d => d.date === date);
+        
+        console.log(`📊 Processing click: ${click.created_at} -> ${date}`);
         
         if (existingDay) {
           existingDay.clicks += 1;
@@ -169,7 +259,15 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
         processedData: processedChartData,
         totalClicks,
         currentPeriodClicks,
-        todayClicks
+        todayClicks,
+        periodStart,
+        periodEnd,
+        user: user.id
+      });
+      
+      // Debug: Log each day's data
+      processedChartData.forEach(day => {
+        console.log(`📊 Chart Day ${day.date}: ${day.clicks} clicks`);
       });
 
       setAnalytics({
@@ -206,7 +304,7 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
             short_url
           )
         `)
-        .order('clicked_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) throw error;
@@ -223,7 +321,7 @@ export const useAnalytics = (startDate?: Date, endDate?: Date) => {
           device_type: click.device_type || 'unknown',
           browser_type: click.browser_type || 'other',
           os_type: click.os_type || 'other',
-          clicked_at: click.clicked_at,
+          clicked_at: click.created_at,
           todayClicks: 0, // Will be updated by real-time subscriptions
           yesterdayClicks: 0 // Will be updated by real-time subscriptions
         };

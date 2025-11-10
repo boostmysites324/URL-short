@@ -2,6 +2,27 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+// Utility function to format time since last click
+export const formatTimeAgo = (dateString: string | null): string => {
+  if (!dateString) return 'Never';
+  
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+  const diffInMonths = Math.floor(diffInDays / 30);
+  const diffInYears = Math.floor(diffInDays / 365);
+  
+  if (diffInMinutes < 1) return 'Just now';
+  if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
+  if (diffInHours < 24) return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
+  if (diffInDays < 30) return `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`;
+  if (diffInMonths < 12) return `${diffInMonths} month${diffInMonths === 1 ? '' : 's'} ago`;
+  return `${diffInYears} year${diffInYears === 1 ? '' : 's'} ago`;
+};
+
 export interface Link {
   id: string;
   original_url: string;
@@ -14,6 +35,9 @@ export interface Link {
   analytics_enabled: boolean;
   total_clicks?: number;
   unique_clicks?: number;
+  yesterday_clicks?: number;
+  today_clicks?: number;
+  last_click_time?: string;
 }
 
 export interface LinkSettings {
@@ -36,7 +60,59 @@ export const useLinks = () => {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(30);
   const [hasMore, setHasMore] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
   const { toast } = useToast();
+
+  // Function to update individual link statistics
+  const updateLinkStats = async (linkId: string) => {
+    try {
+      const { data: clicksData, error } = await supabase
+        .from('clicks')
+        .select('id, ip_address, clicked_at')
+        .eq('link_id', linkId)
+        .order('clicked_at', { ascending: false });
+
+      if (error) {
+        console.error(`Error fetching clicks for link ${linkId}:`, error);
+        return;
+      }
+
+      const totalClicks = clicksData?.length || 0;
+      const uniqueIPs = new Set(clicksData?.map(click => click.ip_address).filter(Boolean) || []);
+      const uniqueClicks = uniqueIPs.size;
+
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const todayClicks = clicksData?.filter(click => 
+        click.clicked_at?.startsWith(today)
+      ).length || 0;
+
+      const yesterdayClicks = clicksData?.filter(click => 
+        click.clicked_at?.startsWith(yesterday)
+      ).length || 0;
+
+      const lastClickTime = clicksData?.[0]?.clicked_at || null;
+
+      // Update the specific link in the state
+      setLinks(prevLinks => 
+        prevLinks.map(link => 
+          link.id === linkId 
+            ? {
+                ...link,
+                total_clicks: totalClicks,
+                unique_clicks: uniqueClicks,
+                today_clicks: todayClicks,
+                yesterday_clicks: yesterdayClicks,
+                last_click_time: lastClickTime
+              }
+            : link
+        )
+      );
+    } catch (error) {
+      console.error(`Error updating stats for link ${linkId}:`, error);
+    }
+  };
 
   const fetchLinks = async (showLogs = false, pageArg?: number) => {
     try {
@@ -80,7 +156,8 @@ export const useLinks = () => {
         const { data: clicksData, error: clicksError } = await supabase
           .from('clicks')
           .select('id, ip_address, clicked_at')
-          .eq('link_id', link.id);
+          .eq('link_id', link.id)
+          .order('clicked_at', { ascending: false });
         
         if (clicksError) {
           console.error(`Error fetching clicks for link ${link.short_code}:`, clicksError);
@@ -92,14 +169,32 @@ export const useLinks = () => {
         const uniqueIPs = new Set(clicksData?.map(click => click.ip_address).filter(Boolean) || []);
         const uniqueClicks = uniqueIPs.size;
         
+        // Calculate today's and yesterday's clicks
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        
+        const todayClicks = clicksData?.filter(click => 
+          click.clicked_at?.startsWith(today)
+        ).length || 0;
+        
+        const yesterdayClicks = clicksData?.filter(click => 
+          click.clicked_at?.startsWith(yesterday)
+        ).length || 0;
+        
+        // Get the most recent click time
+        const lastClickTime = clicksData?.[0]?.clicked_at || null;
+        
         if (showLogs) {
-          console.log(`Link ${link.short_code}: total=${totalClicks}, unique=${uniqueClicks}`);
+          console.log(`Link ${link.short_code}: total=${totalClicks}, unique=${uniqueClicks}, today=${todayClicks}, yesterday=${yesterdayClicks}`);
         }
         
         return {
           ...link,
           total_clicks: totalClicks,
-          unique_clicks: uniqueClicks
+          unique_clicks: uniqueClicks,
+          today_clicks: todayClicks,
+          yesterday_clicks: yesterdayClicks,
+          last_click_time: lastClickTime
         };
       }) || []);
 
@@ -215,15 +310,44 @@ export const useLinks = () => {
         event: 'INSERT',
         schema: 'public',
         table: 'clicks'
-      }, (payload) => {
+      }, async (payload) => {
         console.log('🔗📊 useLinks: Real-time click detected:', payload);
-        fetchLinks(false); // Refresh links when new clicks occur
+        const newClick = payload.new;
+        
+        // Get current user to check if this click belongs to their links
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get the link details for this click
+        const { data: link } = await supabase
+          .from('links')
+          .select('id, user_id')
+          .eq('id', newClick.link_id)
+          .eq('user_id', user.id)
+          .single();
+
+        if (link) {
+          // Update the specific link's statistics efficiently
+          await updateLinkStats(link.id);
+          setLastRefresh(Date.now());
+          
+          // Show a subtle notification for new clicks
+          console.log('🎉 New click detected for link:', link.id);
+        }
       })
       .subscribe();
     console.log('🔗✅ useLinks: Links subscription established');
+
+    // Auto-refresh every 60 seconds to ensure data stays current
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing links data...');
+      fetchLinks(false, 1); // Refresh first page
+      setLastRefresh(Date.now());
+    }, 60000);
     
     return () => {
       supabase.removeChannel(linksSubscription);
+      clearInterval(refreshInterval);
     };
   }, []);
 

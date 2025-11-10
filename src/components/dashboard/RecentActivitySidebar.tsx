@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, Smartphone, Monitor, Globe, TrendingUp, ExternalLink, RefreshCw } from 'lucide-react';
+import { Clock, MapPin, Smartphone, Monitor, Globe, TrendingUp, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -20,6 +20,7 @@ interface ActivityItem {
   created_at: string;
   original_url: string;
   short_url: string;
+  destination_url?: string;
 }
 
 const RecentActivitySidebar = () => {
@@ -69,7 +70,8 @@ const RecentActivitySidebar = () => {
             referrer: newClick.referer || '',
             created_at: newClick.created_at,
             original_url: link.original_url,
-            short_url: link.short_url
+            short_url: link.short_url,
+            destination_url: newClick.destination_url || link.original_url
           };
           
           setActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep only 10 items
@@ -128,7 +130,7 @@ const RecentActivitySidebar = () => {
       const linkIds = userLinks.map(link => link.id);
       console.log('Link IDs to search clicks for:', linkIds);
 
-      // Fetch recent clicks for user's links - try a different approach
+      // Fetch recent clicks for user's links
       const { data: clicks, error } = await supabase
         .from('clicks')
         .select('*')
@@ -172,7 +174,8 @@ const RecentActivitySidebar = () => {
           referrer: click.referer || '',
           created_at: click.created_at,
           original_url: link?.original_url || 'Unknown',
-          short_url: link?.short_url || 'Unknown'
+          short_url: link?.short_url || 'Unknown',
+          destination_url: click.destination_url || link?.original_url
         };
       }) || [];
 
@@ -227,12 +230,36 @@ const RecentActivitySidebar = () => {
   const getDeviceIcon = (deviceType: string) => {
     switch (deviceType.toLowerCase()) {
       case 'mobile':
-        return <Smartphone className="w-3 h-3" />;
+        return <Smartphone className="w-3 h-3 text-blue-600" />;
       case 'desktop':
-        return <Monitor className="w-3 h-3" />;
+        return <Monitor className="w-3 h-3 text-blue-600" />;
       default:
-        return <Monitor className="w-3 h-3" />;
+        return <Monitor className="w-3 h-3 text-blue-600" />;
     }
+  };
+
+  const getBrowserLabel = (browser: string) => {
+    const b = (browser || '').toLowerCase();
+    if (b.includes('chrome')) return 'Chrome';
+    if (b.includes('firefox')) return 'Firefox';
+    if (b.includes('safari')) return 'Safari';
+    if (b.includes('edge')) return 'Edge';
+    if (b.includes('brave')) return 'Brave';
+    return browser || 'Other';
+  };
+
+  const getDomain = (url?: string) => {
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      return u.hostname.replace('www.', '');
+    } catch {
+      return url.replace('https://', '').replace('http://', '');
+    }
+  };
+
+  const getCountryIcon = () => {
+    return <MapPin className="w-3 h-3 text-rose-600" />;
   };
 
   const getBrowserColor = (browser: string) => {
@@ -350,20 +377,37 @@ const RecentActivitySidebar = () => {
 
                   {/* Middle row: location, device, browser, referrer */}
                   <div className="flex items-center flex-wrap gap-1 sm:gap-2 text-xs text-muted-foreground">
-                    <span className="truncate">{activity.city}, {activity.country}</span>
+                    <span className="flex items-center gap-1 truncate"><MapPin className="w-3 h-3 text-rose-600" /> {activity.city}, {activity.country}</span>
                     <span className="hidden sm:inline">•</span>
                     <span className="flex items-center gap-1">{getDeviceIcon(activity.device_type)} <span className="hidden sm:inline">{activity.device_type}</span></span>
                     <span className="hidden sm:inline">•</span>
-                    <Badge className={`px-1 sm:px-1.5 py-0 text-xs ${getBrowserColor(activity.browser)}`}>{activity.browser}</Badge>
+                    <Badge className={`px-1 sm:px-1.5 py-0 text-xs ${getBrowserColor(activity.browser)}`}>{getBrowserLabel(activity.browser)}</Badge>
                     {activity.referrer && (
                       <>
                         <span className="hidden sm:inline">•</span>
-                        <a href={activity.referrer} target="_blank" rel="noopener noreferrer" className="truncate max-w-[120px] sm:max-w-[160px] text-primary hover:underline">
-                          {activity.referrer?.replace('https://', '').replace('http://', '')}
+                        <a href={activity.referrer} target="_blank" rel="noopener noreferrer" className="truncate max-w-[140px] sm:max-w-[180px] text-primary hover:underline flex items-center gap-1">
+                          <Globe className="w-3 h-3" /> {getDomain(activity.referrer)}
                         </a>
                       </>
                     )}
                   </div>
+
+
+                  {/* Historical destination URL */}
+                  {activity.destination_url && (
+                    <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">→</span>
+                      <a 
+                        href={activity.destination_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="truncate max-w-[200px] sm:max-w-[300px] text-primary hover:underline flex items-center gap-1"
+                        title={activity.destination_url}
+                      >
+                        <span className="truncate">{getDomain(activity.destination_url)}</span>
+                      </a>
+                    </div>
+                  )}
 
                   {/* Bottom stats row */}
                   {stats && (
