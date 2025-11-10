@@ -188,7 +188,7 @@ serve(async (req) => {
 
     // Get geolocation data quickly (skip if slow)
     let geoData = {
-      country: 'Unknown',
+      country: null, // Use null for VARCHAR(2) constraint
       country_name: 'Unknown',
       city: 'Unknown',
       region: 'Unknown'
@@ -206,8 +206,16 @@ serve(async (req) => {
       
       if (geoResponse.ok) {
         const geo = await geoResponse.json();
+        // Ensure country code is exactly 2 characters or null (VARCHAR(2) constraint)
+        let countryCode = geo.country_code || null;
+        if (countryCode && typeof countryCode === 'string' && countryCode.length === 2) {
+          countryCode = countryCode.toUpperCase();
+        } else {
+          countryCode = null;
+        }
+        
         geoData = {
-          country: geo.country_code || 'Unknown',
+          country: countryCode,
           country_name: geo.country_name || 'Unknown',
           city: geo.city || 'Unknown',
           region: geo.region || 'Unknown'
@@ -298,20 +306,33 @@ serve(async (req) => {
         } else if (refererHost.includes('messenger.com')) {
           sourcePlatform = 'Messenger';
         } else if (refererHost && refererHost !== '') {
-          // For unknown platforms, show the actual domain name
-          // Remove www. and common prefixes, but keep the full domain
-          let cleanHost = refererHost.replace('www.', '').replace('m.', '');
+          // Check if referer is our own domain (indicates in-app browser like WhatsApp)
+          const isOurDomain = refererHost.includes('vercel.app') || 
+                             refererHost.includes('swift-link') ||
+                             refererHost.includes('247l.ink') ||
+                             refererHost.includes('localhost');
           
-          // If it's a well-known domain pattern, extract the main domain
-          // e.g., "subdomain.example.com" -> "example.com"
-          const parts = cleanHost.split('.');
-          if (parts.length > 2) {
-            // Take last two parts (domain + TLD)
-            cleanHost = parts.slice(-2).join('.');
+          if (isOurDomain) {
+            // Referer is our own domain - this happens when links are opened from WhatsApp
+            // WhatsApp opens links in external browsers, so referer shows our domain
+            // Keep as 'Direct' for now - we'll detect it as WhatsApp later based on mobile device
+            sourcePlatform = 'Direct';
+          } else {
+            // For unknown platforms, show the actual domain name
+            // Remove www. and common prefixes, but keep the full domain
+            let cleanHost = refererHost.replace('www.', '').replace('m.', '');
+            
+            // If it's a well-known domain pattern, extract the main domain
+            // e.g., "subdomain.example.com" -> "example.com"
+            const parts = cleanHost.split('.');
+            if (parts.length > 2) {
+              // Take last two parts (domain + TLD)
+              cleanHost = parts.slice(-2).join('.');
+            }
+            
+            // Capitalize first letter and use full domain
+            sourcePlatform = cleanHost.charAt(0).toUpperCase() + cleanHost.slice(1);
           }
-          
-          // Capitalize first letter and use full domain
-          sourcePlatform = cleanHost.charAt(0).toUpperCase() + cleanHost.slice(1);
         }
       } catch (e) {
         // If referer is not a valid URL, check if it's a non-URL string
@@ -336,22 +357,60 @@ serve(async (req) => {
       // Ignore URL parsing errors
     }
     
+    // Enhanced mobile detection (do this before WhatsApp detection)
+    let deviceType = 'desktop';
+    const userAgentUpper = userAgent.toUpperCase();
+    
+    if (userAgent.includes('Mobile') || 
+        userAgent.includes('Android') ||
+        userAgent.includes('iPhone') ||
+        userAgent.includes('iPod') ||
+        userAgent.includes('BlackBerry') ||
+        userAgent.includes('Windows Phone') ||
+        userAgent.includes('Opera Mini') ||
+        userAgentUpper.includes('MOBILE') ||
+        userAgentUpper.includes('IPHONE') ||
+        userAgentUpper.includes('ANDROID')) {
+      deviceType = 'mobile';
+    } else if (userAgent.includes('Tablet') || 
+               userAgent.includes('iPad') ||
+               userAgentUpper.includes('TABLET') ||
+               userAgentUpper.includes('IPAD')) {
+      deviceType = 'tablet';
+    }
+    
+    // Special WhatsApp detection: If referer was our own domain + mobile device = WhatsApp
+    // WhatsApp mobile app opens links in external browsers with our domain as referer
+    if (sourcePlatform === 'Direct' && deviceType === 'mobile') {
+      try {
+        if (referer) {
+          const refererUrl = new URL(referer);
+          const refererHost = refererUrl.hostname.toLowerCase();
+          const isOurDomain = refererHost.includes('vercel.app') || 
+                             refererHost.includes('swift-link') ||
+                             refererHost.includes('247l.ink') ||
+                             refererHost.includes('localhost');
+          
+          if (isOurDomain) {
+            // Mobile + our domain referer = WhatsApp (most common case)
+            sourcePlatform = 'WhatsApp';
+          }
+        }
+      } catch (e) {
+        // Keep as Direct
+      }
+    }
+    
     console.log('📱 Source Platform Detection:', {
-      userAgent: userAgent.substring(0, 50),
-      referer: referer.substring(0, 50),
+      userAgent: userAgent.substring(0, 80),
+      referer: referer.substring(0, 80),
+      deviceType: deviceType,
       detectedSource: sourcePlatform
     });
     
-    // Simple user agent parsing
-    let deviceType = 'desktop';
+    // Parse browser and OS
     let browser = 'Unknown';
     let os = 'Unknown';
-
-    if (userAgent.includes('Mobile')) {
-      deviceType = 'mobile';
-    } else if (userAgent.includes('Tablet')) {
-      deviceType = 'tablet';
-    }
 
     if (userAgent.includes('Chrome')) {
       browser = 'Chrome';
