@@ -224,7 +224,7 @@ const Statistics = () => {
           totalClicks,
           uniqueClicks,
           topCountry,
-          topReferrer: topDestination,
+          topReferrer, // Show actual referring website (where link was embedded/clicked from)
           topDestinationUrl: topDestinationUrlRaw,
           topSourcePlatform,
           dailyData: dailyData || [],
@@ -599,19 +599,22 @@ const Statistics = () => {
                       <span className="text-lg">{getFlagEmoji(activity.country, activity.country_name)}</span>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold truncate">
-                          {activity.city ? `${activity.city}, ` : ''}{activity.country_name || activity.country || 'Unknown'}
+                          {activity.city && activity.city !== 'Unknown' ? `${activity.city}, ` : ''}{activity.country_name || (activity.country ? activity.country : 'Unknown')}
                         </div>
                         <div className="text-[11px] text-muted-foreground">{(() => { const t = new Date(activity.clicked_at || activity.created_at); const diff = Math.floor((Date.now() - t.getTime())/60000); return diff < 60 ? `${diff} minutes ago` : `${Math.floor(diff/60)} hours ago`; })()}</div>
                         {activity.referer && activity.referer !== 'Direct' && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
-                            <Globe className="w-3 h-3" />
-                            <span className="truncate max-w-[220px] sm:max-w-[360px]">{activity.referer}</span>
-                          </div>
-                        )}
-                        {activity.source_platform && (
                           <div className="flex items-center gap-1 text-xs text-primary truncate mt-1">
-                            <Share2 className="w-3 h-3" />
-                            <span className="font-medium">From: {activity.source_platform}</span>
+                            <Globe className="w-3 h-3" />
+                            <span className="font-medium truncate max-w-[220px] sm:max-w-[360px]">
+                              From: {(() => {
+                                try {
+                                  const url = new URL(activity.referer);
+                                  return url.hostname.replace('www.', '');
+                                } catch {
+                                  return activity.referer;
+                                }
+                              })()}
+                            </span>
                           </div>
                         )}
                         {(activity.destination_url || selectedLink?.original_url) && (
@@ -636,18 +639,53 @@ const Statistics = () => {
                     </div>
                     <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        {String(activity.device_type || '').toLowerCase().includes('iphone') ? (
-                          <Apple className="w-3 h-3" />
-                        ) : String(activity.device_type || '').toLowerCase().includes('android') ? (
-                          <Smartphone className="w-3 h-3 text-green-600" />
-                        ) : (
-                          <Monitor className="w-3 h-3" />
-                        )}
-                        <span className="capitalize">{activity.device_type || 'unknown'}</span>
+                        {(() => {
+                          const osLower = String(activity.os || '').toLowerCase();
+                          const deviceLower = String(activity.device_type || '').toLowerCase();
+                          // Check OS first for more accurate icons
+                          if (osLower.includes('ios') || osLower.includes('iphone') || osLower.includes('ipad') || deviceLower.includes('iphone') || deviceLower.includes('ipad')) {
+                            return <Apple className="w-3 h-3" />;
+                          } else if (osLower.includes('android') || deviceLower.includes('android')) {
+                            return <Smartphone className="w-3 h-3 text-green-600" />;
+                          } else if (deviceLower.includes('mobile') || deviceLower.includes('tablet')) {
+                            return <Smartphone className="w-3 h-3" />;
+                          } else {
+                            return <Monitor className="w-3 h-3" />;
+                          }
+                        })()}
+                        <span className="capitalize">{activity.device_type || 'desktop'}</span>
                       </div>
-                      <div className="flex items-center gap-1"><Chrome className="w-3 h-3" /><span>{activity.browser || 'Unknown'}</span></div>
-                      <div className="flex items-center gap-1"><User className="w-3 h-3" /><span>{activity.os || 'Unknown'}</span></div>
-                      <div className="flex items-center gap-1"><span className="px-1 rounded border text-[10px]">A</span><span>{activity.language || 'English'}</span></div>
+                      <div className="flex items-center gap-1">
+                        {(() => {
+                          const browserLower = String(activity.browser || '').toLowerCase();
+                          if (browserLower.includes('safari')) {
+                            return <span className="text-blue-600">🧭</span>;
+                          } else if (browserLower.includes('chrome')) {
+                            return <Chrome className="w-3 h-3 text-yellow-600" />;
+                          } else if (browserLower.includes('firefox')) {
+                            return <span className="text-orange-600">🦊</span>;
+                          } else {
+                            return <Chrome className="w-3 h-3" />;
+                          }
+                        })()}
+                        <span>{activity.browser || 'Unknown'}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {(() => {
+                          const osLower = String(activity.os || '').toLowerCase();
+                          if (osLower.includes('ios') || osLower.includes('iphone') || osLower.includes('mac')) {
+                            return <Apple className="w-3 h-3" />;
+                          } else if (osLower.includes('android')) {
+                            return <Smartphone className="w-3 h-3 text-green-600" />;
+                          } else if (osLower.includes('windows')) {
+                            return <Monitor className="w-3 h-3" />;
+                          } else {
+                            return <User className="w-3 h-3" />;
+                          }
+                        })()}
+                        <span>{activity.os || 'Unknown'}</span>
+                      </div>
+                      <div className="flex items-center gap-1"><span className="px-1 rounded border text-[10px]">A</span><span>{activity.language || 'EN'}</span></div>
                     </div>
                   </div>
                 </div>
