@@ -186,7 +186,7 @@ serve(async (req) => {
 
     const isUnique = !existingClick || existingClick.length === 0;
 
-    // Get geolocation data quickly (skip if slow)
+    // Get geolocation data with multiple fallback APIs
     let geoData = {
       country: null, // Use null for VARCHAR(2) constraint
       country_name: 'Unknown',
@@ -194,35 +194,112 @@ serve(async (req) => {
       region: 'Unknown'
     };
 
-    try {
-      // Quick geolocation with 2 second timeout
-      const geoController = new AbortController();
-      const geoTimeout = setTimeout(() => geoController.abort(), 2000);
-      
-      const geoResponse = await fetch(`https://ipapi.co/${normalizedIP}/json/`, {
-        signal: geoController.signal
-      });
-      clearTimeout(geoTimeout);
-      
-      if (geoResponse.ok) {
-        const geo = await geoResponse.json();
-        // Ensure country code is exactly 2 characters or null (VARCHAR(2) constraint)
-        let countryCode = geo.country_code || null;
-        if (countryCode && typeof countryCode === 'string' && countryCode.length === 2) {
-          countryCode = countryCode.toUpperCase();
-        } else {
-          countryCode = null;
+    // Try multiple geolocation APIs for better reliability
+    const geoApis = [
+      // Primary: ipapi.co (free, 1000 requests/day)
+      async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        try {
+          const response = await fetch(`https://ipapi.co/${normalizedIP}/json/`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeout);
+          if (response.ok) {
+            const geo = await response.json();
+            return {
+              country: geo.country_code || null,
+              country_name: geo.country_name || null,
+              city: geo.city || null,
+              region: geo.region || null
+            };
+          }
+        } catch (e) {
+          clearTimeout(timeout);
         }
-        
-        geoData = {
-          country: countryCode,
-          country_name: geo.country_name || 'Unknown',
-          city: geo.city || 'Unknown',
-          region: geo.region || 'Unknown'
-        };
+        return null;
+      },
+      // Fallback 1: ip-api.com (free, 45 requests/minute)
+      async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        try {
+          const response = await fetch(`http://ip-api.com/json/${normalizedIP}?fields=status,country,countryCode,city,regionName`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeout);
+          if (response.ok) {
+            const geo = await response.json();
+            if (geo.status === 'success') {
+              return {
+                country: geo.countryCode || null,
+                country_name: geo.country || null,
+                city: geo.city || null,
+                region: geo.regionName || null
+              };
+            }
+          }
+        } catch (e) {
+          clearTimeout(timeout);
+        }
+        return null;
+      },
+      // Fallback 2: ipgeolocation.io (free tier available)
+      async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 1500);
+        try {
+          const response = await fetch(`https://api.ipgeolocation.io/ipgeo?ip=${normalizedIP}`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeout);
+          if (response.ok) {
+            const geo = await response.json();
+            return {
+              country: geo.country_code2 || null,
+              country_name: geo.country_name || null,
+              city: geo.city || null,
+              region: geo.state_prov || null
+            };
+          }
+        } catch (e) {
+          clearTimeout(timeout);
+        }
+        return null;
       }
-    } catch (geoError) {
-      console.log('Geolocation failed or timed out, using defaults:', geoError);
+    ];
+
+    // Try each API until one succeeds
+    for (const geoApi of geoApis) {
+      try {
+        const result = await geoApi();
+        if (result && (result.country || result.country_name)) {
+          // Ensure country code is exactly 2 characters or null (VARCHAR(2) constraint)
+          let countryCode = result.country || null;
+          if (countryCode && typeof countryCode === 'string' && countryCode.length === 2) {
+            countryCode = countryCode.toUpperCase();
+          } else {
+            countryCode = null;
+          }
+          
+          geoData = {
+            country: countryCode,
+            country_name: result.country_name || null,
+            city: result.city || null,
+            region: result.region || null
+          };
+          console.log('✅ Geolocation success:', geoData);
+          break; // Success, stop trying other APIs
+        }
+      } catch (error) {
+        console.log('Geolocation API failed, trying next...', error);
+        continue; // Try next API
+      }
+    }
+
+    // If we still don't have country, log it
+    if (!geoData.country && !geoData.country_name) {
+      console.log('⚠️ Geolocation failed for IP:', normalizedIP);
     }
 
     // Parse user agent for device/browser info

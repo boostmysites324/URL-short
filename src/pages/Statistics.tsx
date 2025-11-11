@@ -642,7 +642,23 @@ const Statistics = () => {
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold truncate">
-                          {activity.city && activity.city !== 'Unknown' ? `${activity.city}, ` : ''}{activity.country_name || (activity.country ? activity.country : 'Unknown')}
+                          {(() => {
+                            const city = activity.city && activity.city !== 'Unknown' && activity.city !== null ? activity.city : null;
+                            const countryName = activity.country_name && activity.country_name !== 'Unknown' && activity.country_name !== null ? activity.country_name : null;
+                            const countryCode = activity.country && activity.country !== 'Unknown' && activity.country !== null ? activity.country : null;
+                            
+                            if (city && countryName) {
+                              return `${city}, ${countryName}`;
+                            } else if (city && countryCode) {
+                              return `${city}, ${countryCode}`;
+                            } else if (countryName) {
+                              return `Somewhere in ${countryName}`;
+                            } else if (countryCode) {
+                              return `Somewhere in ${countryCode}`;
+                            } else {
+                              return 'Unknown';
+                            }
+                          })()}
                         </div>
                         <div className="text-[11px] text-muted-foreground">{(() => { const t = new Date(activity.clicked_at || activity.created_at); const diff = Math.floor((Date.now() - t.getTime())/60000); return diff < 60 ? `${diff} minutes ago` : `${Math.floor(diff/60)} hours ago`; })()}</div>
                         {(() => {

@@ -377,7 +377,23 @@ const RecentActivitySidebar = () => {
 
                   {/* Middle row: location, device, browser, referrer */}
                   <div className="flex items-center flex-wrap gap-1 sm:gap-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1 truncate"><MapPin className="w-3 h-3 text-rose-600" /> {activity.city}, {activity.country}</span>
+                    <span className="flex items-center gap-1 truncate"><MapPin className="w-3 h-3 text-rose-600" /> {(() => {
+                      const city = activity.city && activity.city !== 'Unknown' && activity.city !== null ? activity.city : null;
+                      const countryName = activity.country_name && activity.country_name !== 'Unknown' && activity.country_name !== null ? activity.country_name : null;
+                      const countryCode = activity.country && activity.country !== 'Unknown' && activity.country !== null ? activity.country : null;
+                      
+                      if (city && countryName) {
+                        return `${city}, ${countryName}`;
+                      } else if (city && countryCode) {
+                        return `${city}, ${countryCode}`;
+                      } else if (countryName) {
+                        return `Somewhere in ${countryName}`;
+                      } else if (countryCode) {
+                        return `Somewhere in ${countryCode}`;
+                      } else {
+                        return 'Unknown';
+                      }
+                    })()}</span>
                     <span className="hidden sm:inline">•</span>
                     <span className="flex items-center gap-1">{getDeviceIcon(activity.device_type)} <span className="hidden sm:inline">{activity.device_type}</span></span>
                     <span className="hidden sm:inline">•</span>

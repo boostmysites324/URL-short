@@ -165,7 +165,23 @@ const RecentActivity = ({ linkId, isOpen, onClose }: RecentActivityProps) => {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
-                          <span className="font-medium text-card-foreground">{activity.city}, {activity.country}</span>
+                          <span className="font-medium text-card-foreground">{(() => {
+                            const city = activity.city && activity.city !== 'Unknown' && activity.city !== null ? activity.city : null;
+                            const countryName = activity.country_name && activity.country_name !== 'Unknown' && activity.country_name !== null ? activity.country_name : null;
+                            const countryCode = activity.country && activity.country !== 'Unknown' && activity.country !== null ? activity.country : null;
+                            
+                            if (city && countryName) {
+                              return `${city}, ${countryName}`;
+                            } else if (city && countryCode) {
+                              return `${city}, ${countryCode}`;
+                            } else if (countryName) {
+                              return `Somewhere in ${countryName}`;
+                            } else if (countryCode) {
+                              return `Somewhere in ${countryCode}`;
+                            } else {
+                              return 'Unknown';
+                            }
+                          })()}</span>
                           <Badge variant="outline" className="text-xs">
                             {activity.device_type}
                           </Badge>
@@ -176,7 +192,23 @@ const RecentActivity = ({ linkId, isOpen, onClose }: RecentActivityProps) => {
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                           <div className="flex items-center space-x-1">
                             <MapPin className="w-3 h-3" />
-                            <span>{activity.city}, {activity.country}</span>
+                            <span>{(() => {
+                              const city = activity.city && activity.city !== 'Unknown' && activity.city !== null ? activity.city : null;
+                              const countryName = activity.country_name && activity.country_name !== 'Unknown' && activity.country_name !== null ? activity.country_name : null;
+                              const countryCode = activity.country && activity.country !== 'Unknown' && activity.country !== null ? activity.country : null;
+                              
+                              if (city && countryName) {
+                                return `${city}, ${countryName}`;
+                              } else if (city && countryCode) {
+                                return `${city}, ${countryCode}`;
+                              } else if (countryName) {
+                                return `Somewhere in ${countryName}`;
+                              } else if (countryCode) {
+                                return `Somewhere in ${countryCode}`;
+                              } else {
+                                return 'Unknown';
+                              }
+                            })()}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <Clock className="w-3 h-3" />
