@@ -114,7 +114,8 @@ export default function DailyClicksChart({ from, to, linkId, showMetrics = true 
         const dataPoints: ChartDataPoint[] = Array.from({ length: totalDays }, (_, i) => {
           const currentDate = addDays(startDate, i);
           const dateStr = format(currentDate, 'yyyy-MM-dd');
-          const formattedDate = format(currentDate, 'dd LLLL');
+          // Use shorter format for mobile: "29 Oct" instead of "29 October"
+          const formattedDate = format(currentDate, 'dd MMM');
 
           const dayClicks = (clicksData || []).filter(click => (click.created_at || '').startsWith(dateStr));
           const uniqueIPs = new Set(dayClicks.map(click => click.ip_address).filter(Boolean));
@@ -237,23 +238,40 @@ export default function DailyClicksChart({ from, to, linkId, showMetrics = true 
             </div>
           </div>
         ) : (
-          <div className="h-80 w-full">
-            <ChartContainer config={chartConfig} className="h-full w-full">
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <div className="h-64 sm:h-80 w-full overflow-x-auto">
+            <ChartContainer config={chartConfig} className="h-full w-full min-w-[500px] sm:min-w-0">
+              <BarChart 
+                data={chartData} 
+                margin={{ 
+                  top: 20, 
+                  right: 10, 
+                  left: 0, 
+                  bottom: 60 
+                }}
+                className="sm:mx-4"
+              >
                 <CartesianGrid strokeDasharray="3 3" className="opacity-30" stroke="hsl(var(--muted-foreground))" />
                 <XAxis 
                   dataKey="formattedDate" 
-                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ 
+                    fontSize: 10, 
+                    fill: 'hsl(var(--muted-foreground))',
+                    angle: -45,
+                    textAnchor: 'end',
+                    height: 60
+                  }}
                   tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--muted-foreground))' }}
-                  interval={0}
+                  interval="preserveStartEnd"
+                  height={60}
                 />
                 <YAxis 
                   domain={[0, yAxisMax]}
-                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                   tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--muted-foreground))' }}
-                  tickCount={10}
+                  tickCount={6}
+                  width={30}
                 />
                 <ChartTooltip 
                   content={<ChartTooltipContent 
@@ -266,7 +284,7 @@ export default function DailyClicksChart({ from, to, linkId, showMetrics = true 
                   dataKey="clicks"
                   fill="hsl(217 91% 60%)"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={40}
+                  maxBarSize={60}
                 />
               </BarChart>
             </ChartContainer>
