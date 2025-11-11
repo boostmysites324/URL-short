@@ -680,8 +680,8 @@ const LinkShortener = () => {
                         <SelectTrigger className="w-full h-9 rounded-md"><SelectValue placeholder="Direct" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="direct">Direct</SelectItem>
-                          <SelectItem value="masked">Masked</SelectItem>
-                          <SelectItem value="splash">Splash Page</SelectItem>
+                          {/* <SelectItem value="masked">Masked</SelectItem>
+                          <SelectItem value="splash">Splash Page</SelectItem> */}
                         </SelectContent>
                       </Select>
                     </div>
