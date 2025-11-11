@@ -37,6 +37,8 @@ const AppRoutes = () => {
           path="/" 
           element={user ? <Index /> : <AuthPage />} 
         />
+        {/* Custom domain short links (e.g., 247l.ink/H44F2U) - Must be LAST before NotFound */}
+        <Route path="/:shortCode" element={<Redirect />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
