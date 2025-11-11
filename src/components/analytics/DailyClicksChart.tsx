@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { format, addDays, startOfDay, endOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw, TrendingUp, Users, BarChart3 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type DailyClicksChartProps = {
   from: Date;
@@ -30,6 +31,7 @@ const chartConfig = {
 export default function DailyClicksChart({ from, to, linkId, showMetrics = true }: DailyClicksChartProps) {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
   // KPI metrics
   const [totalAllTime, setTotalAllTime] = useState(0);
   const [totalInPeriod, setTotalInPeriod] = useState(0);
@@ -238,40 +240,38 @@ export default function DailyClicksChart({ from, to, linkId, showMetrics = true 
             </div>
           </div>
         ) : (
-          <div className="h-64 sm:h-80 w-full overflow-x-auto">
-            <ChartContainer config={chartConfig} className="h-full w-full min-w-[500px] sm:min-w-0">
+          <div className="h-64 sm:h-80 w-full">
+            <ChartContainer config={chartConfig} className="h-full w-full">
               <BarChart 
                 data={chartData} 
                 margin={{ 
-                  top: 20, 
-                  right: 10, 
-                  left: 0, 
-                  bottom: 60 
+                  top: 10, 
+                  right: isMobile ? 5 : 10, 
+                  left: isMobile ? -15 : -5, 
+                  bottom: isMobile ? 45 : 50 
                 }}
-                className="sm:mx-4"
               >
                 <CartesianGrid strokeDasharray="3 3" className="opacity-30" stroke="hsl(var(--muted-foreground))" />
                 <XAxis 
                   dataKey="formattedDate" 
                   tick={{ 
-                    fontSize: 10, 
+                    fontSize: isMobile ? 8 : 10, 
                     fill: 'hsl(var(--muted-foreground))',
                     angle: -45,
-                    textAnchor: 'end',
-                    height: 60
+                    textAnchor: 'end'
                   }}
                   tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--muted-foreground))' }}
-                  interval="preserveStartEnd"
-                  height={60}
+                  interval={isMobile ? Math.max(0, Math.floor((chartData.length - 1) / 6)) : 0}
+                  height={50}
                 />
                 <YAxis 
                   domain={[0, yAxisMax]}
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: isMobile ? 8 : 10, fill: 'hsl(var(--muted-foreground))' }}
                   tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--muted-foreground))' }}
-                  tickCount={6}
-                  width={30}
+                  tickCount={isMobile ? 5 : 6}
+                  width={isMobile ? 30 : 40}
                 />
                 <ChartTooltip 
                   content={<ChartTooltipContent 
@@ -284,7 +284,6 @@ export default function DailyClicksChart({ from, to, linkId, showMetrics = true 
                   dataKey="clicks"
                   fill="hsl(217 91% 60%)"
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={60}
                 />
               </BarChart>
             </ChartContainer>
