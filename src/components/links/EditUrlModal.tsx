@@ -107,8 +107,8 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
 
   const isValidAliasFormat = (value: string) => {
     if (!value) return false;
-    // 3-64 chars, alphanumerics, hyphen and underscore
-    const re = /^[A-Za-z0-9-_]{3,64}$/;
+    // 3-15 chars, alphanumerics, hyphen and underscore
+    const re = /^[A-Za-z0-9-_]{3,15}$/;
     return re.test(value);
   };
 
@@ -142,13 +142,25 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
       }
 
       // Validate alias format
-      if (!isValidAliasFormat(customAlias)) {
-        setAliasValidation({ isValid: false, message: 'Alias must be 3-64 chars: letters, numbers, - or _' });
+      if (customAlias.length > 15) {
+        setAliasValidation({ isValid: false, message: 'Alias must be 15 characters or less' });
         toast({
-          title: "Error",
-          description: 'Invalid alias format',
+          title: "Alias too long",
+          description: "Custom alias must be 15 characters or less. Please choose a shorter alias.",
           variant: "destructive",
         });
+        setLoading(false);
+        return;
+      }
+      
+      if (!isValidAliasFormat(customAlias)) {
+        setAliasValidation({ isValid: false, message: 'Alias must be 3-15 chars: letters, numbers, - or _' });
+        toast({
+          title: "Error",
+          description: 'Alias must be 3-15 characters and contain only letters, numbers, hyphens, or underscores',
+          variant: "destructive",
+        });
+        setLoading(false);
         return;
       }
 
@@ -306,7 +318,11 @@ export default function EditUrlModal({ isOpen, onClose, link, onUpdate }: EditUr
               onChange={(e) => {
                 const v = e.target.value.trim();
                 setCustomAlias(v);
-                setAliasValidation({ isValid: isValidAliasFormat(v), message: isValidAliasFormat(v) ? '' : '3-64 chars: letters, numbers, - or _' });
+                if (v.length > 15) {
+                  setAliasValidation({ isValid: false, message: 'Alias must be 15 characters or less' });
+                } else {
+                  setAliasValidation({ isValid: isValidAliasFormat(v), message: isValidAliasFormat(v) ? '' : '3-15 chars: letters, numbers, - or _' });
+                }
               }}
             />
             {!aliasValidation.isValid && (

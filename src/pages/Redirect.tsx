@@ -19,7 +19,6 @@ const Redirect = () => {
     const handleRedirect = async () => {
       // Prevent double execution
       if (hasProcessedRef.current) {
-        console.log('Already processed, skipping...');
         return;
       }
       hasProcessedRef.current = true;
@@ -32,7 +31,6 @@ const Redirect = () => {
       try {
         // Use the track-click function to handle everything (link lookup, validation, tracking, redirect)
         try {
-          console.log('🚀 REDIRECT: Tracking click for short code:', shortCode, 'at', new Date().toISOString());
           const trackResult = await supabase.functions.invoke('track-click', {
             body: { code: shortCode },
             headers: {
@@ -41,15 +39,11 @@ const Redirect = () => {
               'accept-language': navigator.language,
             }
           });
-          console.log('Track click result:', trackResult);
-          console.log('Track click result data:', trackResult.data);
-          console.log('Track click result error:', trackResult.error);
           
           // Check for 401 error (password required) first
           if (trackResult.error && 
               (trackResult.error.message?.includes('non-2xx status code') || 
                trackResult.error.message?.includes('401'))) {
-            console.log('🔒 Password required for this link');
             setRequiresPassword(true);
             setLoading(false);
             return;
@@ -62,28 +56,23 @@ const Redirect = () => {
               setRequiresPassword(true);
               setLoading(false);
             } else if (trackResult.data.redirect && trackResult.data.url) {
-              // Handle all redirect types (direct, masked, splash)
-              console.log('Redirecting to:', trackResult.data.url);
-              window.location.href = trackResult.data.url;
+              // Instant redirect - use replace to avoid showing loading screen
+              window.location.replace(trackResult.data.url);
+              return; // Don't set loading to false, just redirect immediately
             } else {
-              console.error('Unexpected response format:', trackResult.data);
               setError('Unexpected response from server.');
               setLoading(false);
             }
           } else {
-            console.error('No data in response:', trackResult);
             setError('No data received from server.');
             setLoading(false);
           }
         } catch (trackError: any) {
-          console.error('Error with track-click function:', trackError);
-          
           // Check if it's a 401 error (password required)
           if (trackError?.status === 401 || 
               trackError?.response?.status === 401 || 
               trackError?.message?.includes('401') ||
               trackError?.message?.includes('non-2xx status code')) {
-            console.log('🔒 Password required for this link');
             setRequiresPassword(true);
             setLoading(false);
             return;
@@ -116,23 +105,22 @@ const Redirect = () => {
               return;
             }
 
-            // If password protected, show password form (not implemented in this component yet)
+            // If password protected, show password form
             if (link.password_hash) {
-              setError('This link is password protected.');
+              setRequiresPassword(true);
               setLoading(false);
               return;
             }
 
-            // Redirect to the original URL
-            window.location.href = link.original_url;
+            // Instant redirect - use replace to avoid showing loading screen
+            window.location.replace(link.original_url);
+            return; // Don't set loading to false, just redirect immediately
           } catch (fallbackError) {
-            console.error('Fallback error:', fallbackError);
             setError('Unable to access link. Please try again.');
             setLoading(false);
           }
         }
       } catch (err) {
-        console.error('Redirect error:', err);
         setError('An unexpected error occurred.');
         setLoading(false);
       }

@@ -79,6 +79,23 @@ serve(async (req) => {
     const maxAttempts = 10;
 
     if (customAlias) {
+      // Validate custom alias length (max 15 characters)
+      if (customAlias.length > 15) {
+        return new Response(
+          JSON.stringify({ error: 'Custom alias must be 15 characters or less' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Validate custom alias format (3-15 chars, alphanumerics, hyphen and underscore)
+      const aliasRegex = /^[A-Za-z0-9-_]{3,15}$/;
+      if (!aliasRegex.test(customAlias)) {
+        return new Response(
+          JSON.stringify({ error: 'Custom alias must be 3-15 characters and contain only letters, numbers, hyphens, or underscores' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       // Check if custom alias is available
       const { data: existingLink } = await supabaseClient
         .from('links')

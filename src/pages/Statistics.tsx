@@ -674,8 +674,7 @@ const Statistics = () => {
                               // Check if it's our own domain
                               if (hostname.includes('vercel.app') || 
                                   hostname.includes('swift-link') || 
-                                  hostname.includes('247l.ink') ||
-                                  hostname.includes('localhost')) {
+                                  hostname.includes('247l.ink')) {
                                 isOurDomain = true;
                               } else {
                                 embeddedWebsite = hostname;

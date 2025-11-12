@@ -79,6 +79,28 @@ const QuickShortenerModal = ({ isOpen, onClose }: QuickShortenerModalProps) => {
     setLoading(true);
     setCreatedLinks([]);
 
+    // Validate custom alias if provided
+    if (customAlias) {
+      if (customAlias.length > 15) {
+        toast({
+          title: "Alias too long",
+          description: "Custom alias must be 15 characters or less. Please choose a shorter alias.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const aliasRegex = /^[A-Za-z0-9-_]{3,15}$/;
+      if (!aliasRegex.test(customAlias)) {
+        toast({
+          title: "Invalid alias format",
+          description: "Alias must be 3-15 characters and contain only letters, numbers, hyphens, or underscores",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     try {
       const urlList = mode === 'multiple' 
         ? urls.split('\n').filter(url => url.trim())
