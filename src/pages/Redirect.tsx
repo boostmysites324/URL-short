@@ -14,22 +14,80 @@ const Redirect = () => {
   const [passwordError, setPasswordError] = useState('');
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const hasProcessedRef = useRef(false);
+  const redirectInjectedRef = useRef(false);
 
-  // Immediate redirect effect - runs synchronously BEFORE paint to prevent white screen
+  // Helper function to extract domain from URL
+  const getDomainFromUrl = (url: string): string | null => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname;
+    } catch {
+      return null;
+    }
+  };
+
+  // Helper function to set favicon for destination website
+  const setFavicon = (url: string) => {
+    const domain = getDomainFromUrl(url);
+    if (!domain) return;
+
+    // Remove existing favicon links
+    const existingLinks = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+    existingLinks.forEach(link => link.remove());
+
+    // Create new favicon link using Google's favicon service
+    const faviconLink = document.createElement('link');
+    faviconLink.rel = 'icon';
+    faviconLink.type = 'image/png';
+    faviconLink.href = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+    document.head.appendChild(faviconLink);
+
+    // Also set as shortcut icon for better compatibility
+    const shortcutLink = document.createElement('link');
+    shortcutLink.rel = 'shortcut icon';
+    shortcutLink.href = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+    document.head.appendChild(shortcutLink);
+
+    // Update page title to destination domain
+    document.title = domain;
+  };
+
+  // Inject redirect script IMMEDIATELY before React renders anything
+  // This makes the browser show its native loader instead of white screen
   useLayoutEffect(() => {
-    if (redirectUrl) {
-      // Inject redirect script immediately in head for instant redirect
-      const script = document.createElement('script');
-      script.textContent = `window.location.replace("${redirectUrl}");`;
-      document.head.appendChild(script);
+    if (redirectUrl && !redirectInjectedRef.current) {
+      redirectInjectedRef.current = true;
       
-      // Also use location.replace as backup
+      // Set favicon to destination website's icon
+      setFavicon(redirectUrl);
+      
+      // Make html and body transparent so no white screen shows
+      document.documentElement.style.backgroundColor = 'transparent';
+      document.body.style.backgroundColor = 'transparent';
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+      
+      // Inject meta refresh for instant redirect (shows browser loader in tab)
+      const meta = document.createElement('meta');
+      meta.httpEquiv = 'refresh';
+      meta.content = `0;url=${redirectUrl}`;
+      document.head.appendChild(meta);
+      
+      // Use location.replace - this triggers browser's native loading indicator in tab
+      // The browser will show its spinner while loading the destination page
       window.location.replace(redirectUrl);
       return;
     }
   }, [redirectUrl]);
 
   useEffect(() => {
+    // Make body and html transparent immediately to prevent white screen
+    // This ensures only browser's native loader shows, no white page
+    document.documentElement.style.backgroundColor = 'transparent';
+    document.body.style.backgroundColor = 'transparent';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    
     const handleRedirect = async () => {
       // Prevent double execution
       if (hasProcessedRef.current) {
@@ -68,6 +126,11 @@ const Redirect = () => {
               // Link requires password
               setRequiresPassword(true);
             } else if (trackResult.data.redirect && trackResult.data.url) {
+              // Set favicon immediately when we get the redirect URL
+              const domain = getDomainFromUrl(trackResult.data.url);
+              if (domain) {
+                setFavicon(trackResult.data.url);
+              }
               // Set redirect URL - this will trigger immediate redirect via useEffect
               setRedirectUrl(trackResult.data.url);
               return;
@@ -125,6 +188,11 @@ const Redirect = () => {
               return;
             }
 
+            // Set favicon immediately when we get the redirect URL
+            const domain = getDomainFromUrl(linkData.original_url);
+            if (domain) {
+              setFavicon(linkData.original_url);
+            }
             // Set redirect URL - this will trigger immediate redirect via useEffect
             setRedirectUrl(linkData.original_url);
             return;
@@ -156,6 +224,11 @@ const Redirect = () => {
 
       if (trackResult.data) {
         if (trackResult.data.redirect && trackResult.data.url) {
+          // Set favicon when password is correct
+          const domain = getDomainFromUrl(trackResult.data.url);
+          if (domain) {
+            setFavicon(trackResult.data.url);
+          }
           setRedirectUrl(trackResult.data.url);
         } else if (trackResult.data.error) {
           setPasswordError(trackResult.data.error);
@@ -176,16 +249,16 @@ const Redirect = () => {
     }
   };
 
-  // If we have a redirect URL, return nothing - redirect happens via useEffect
-  // This prevents any white screen from showing
+  // If we have a redirect URL, return transparent div - redirect happens via useLayoutEffect
+  // This prevents any white screen from showing, browser loader will show instead
   if (redirectUrl) {
-    return null;
+    return <div style={{ backgroundColor: 'transparent', width: '100%', height: '100vh', margin: 0, padding: 0 }} />;
   }
 
-  // While loading (before we know if we need password or error), return nothing
-  // This prevents white screen during API call
+  // While loading (before we know if we need password or error), return transparent div
+  // This prevents white screen during API call, browser loader will show
   if (!error && !requiresPassword && !redirectUrl) {
-    return null;
+    return <div style={{ backgroundColor: 'transparent', width: '100%', height: '100vh', margin: 0, padding: 0 }} />;
   }
 
   if (requiresPassword) {
