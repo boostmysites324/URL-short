@@ -8,20 +8,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 const Redirect = () => {
   const { shortCode } = useParams<{ shortCode: string }>();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean | null>(null); // null = not started, true = loading, false = done
   const [error, setError] = useState<string | null>(null);
   const [requiresPassword, setRequiresPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const hasProcessedRef = useRef(false);
+  const redirectingRef = useRef(false);
 
   useEffect(() => {
     const handleRedirect = async () => {
       // Prevent double execution
-      if (hasProcessedRef.current) {
+      if (hasProcessedRef.current || redirectingRef.current) {
         return;
       }
       hasProcessedRef.current = true;
+      
       if (!shortCode) {
         setError('Short code is missing.');
         setLoading(false);
@@ -56,9 +58,16 @@ const Redirect = () => {
               setRequiresPassword(true);
               setLoading(false);
             } else if (trackResult.data.redirect && trackResult.data.url) {
-              // Instant redirect - use replace to avoid showing loading screen
+              // INSTANT redirect using meta refresh for zero-delay redirect
+              redirectingRef.current = true;
+              // Inject meta refresh tag immediately
+              const meta = document.createElement('meta');
+              meta.httpEquiv = 'refresh';
+              meta.content = `0;url=${trackResult.data.url}`;
+              document.head.appendChild(meta);
+              // Also use location.replace as backup
               window.location.replace(trackResult.data.url);
-              return; // Don't set loading to false, just redirect immediately
+              return;
             } else {
               setError('Unexpected response from server.');
               setLoading(false);
@@ -112,9 +121,16 @@ const Redirect = () => {
               return;
             }
 
-            // Instant redirect - use replace to avoid showing loading screen
+            // INSTANT redirect using meta refresh for zero-delay redirect
+            redirectingRef.current = true;
+            // Inject meta refresh tag immediately
+            const meta = document.createElement('meta');
+            meta.httpEquiv = 'refresh';
+            meta.content = `0;url=${link.original_url}`;
+            document.head.appendChild(meta);
+            // Also use location.replace as backup
             window.location.replace(link.original_url);
-            return; // Don't set loading to false, just redirect immediately
+            return;
           } catch (fallbackError) {
             setError('Unable to access link. Please try again.');
             setLoading(false);
@@ -128,6 +144,11 @@ const Redirect = () => {
 
     handleRedirect();
   }, [shortCode]);
+
+  // If we're redirecting, don't render anything
+  if (redirectingRef.current) {
+    return null;
+  }
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,15 +194,12 @@ const Redirect = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Redirecting...</p>
-        </div>
-      </div>
-    );
+  // Don't show loading screen - only show if we need password or have error
+  // For normal redirects, we redirect immediately without rendering
+  if (loading === null || loading === true) {
+    // Only show loading if we're waiting for password check
+    // For normal redirects, we should have redirected already
+    return null;
   }
 
   if (requiresPassword) {
