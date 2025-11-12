@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./components/auth/AuthPage";
 import Redirect from "./pages/Redirect";
+import PasswordPage from "./pages/PasswordPage";
 import Statistics from "./pages/Statistics";
 import GlobalStatistics from "./pages/GlobalStatistics";
 import Archives from "./pages/Archives";
@@ -44,9 +45,10 @@ const FaviconManager = () => {
 
   // Set default ShortLink favicon on all pages except redirect pages
   useEffect(() => {
-    // Only set default favicon if not on a redirect route
-    // Redirect page will handle its own favicon changes
+    // Only set default favicon if not on a redirect route or password page
+    // Redirect and password pages will handle their own favicon changes
     const isRedirectRoute = location.pathname.startsWith('/s/') || 
+      location.pathname.startsWith('/password/') ||
       (location.pathname.split('/').filter(Boolean).length === 1 && 
        !['auth', 'statistics', 'archives'].includes(location.pathname.split('/').filter(Boolean)[0] || ''));
     
@@ -74,6 +76,7 @@ const AppRoutes = () => {
       <FaviconManager />
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/password/:shortCode" element={<PasswordPage />} />
         <Route path="/s/:shortCode" element={<Redirect />} />
         <Route path="/statistics/:linkId" element={<Statistics />} />
         <Route path="/statistics" element={<GlobalStatistics />} />

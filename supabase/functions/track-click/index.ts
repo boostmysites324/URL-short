@@ -23,20 +23,25 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body once
-    let requestBody = {};
+    // Parse request body once (for POST requests with password)
+    let requestBody: any = {};
     try {
-      requestBody = await req.json();
+      if (req.method === 'POST') {
+        const contentType = req.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          requestBody = await req.json();
+        }
+      }
     } catch (e) {
       console.log('No request body or invalid JSON');
     }
     
-    // Get short code from request body or URL path
-    let shortCode = requestBody.code;
+    // Get short code from URL query parameter (primary), request body (for password), or URL path
+    const url = new URL(req.url);
+    let shortCode = url.searchParams.get('code') || requestBody.code;
     
     if (!shortCode) {
       // Fallback to URL path parsing
-      const url = new URL(req.url);
       const pathParts = url.pathname.split('/');
       shortCode = pathParts[pathParts.length - 1];
     }
@@ -115,6 +120,22 @@ serve(async (req) => {
       
       if (!password) {
         console.log('🔒 Password required for link:', link.id);
+        
+        // For GET requests (direct access), redirect to password page
+        if (req.method === 'GET') {
+          const requestUrl = new URL(req.url);
+          const domain = requestUrl.hostname;
+          const protocol = requestUrl.protocol;
+          return new Response(null, {
+            status: 302,
+            headers: {
+              'Location': `${protocol}//${domain}/password/${shortCode}`,
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+            },
+          });
+        }
+        
+        // For POST requests (from React), return JSON
         return new Response(JSON.stringify({
           error: 'Password required',
           requiresPassword: true
@@ -143,6 +164,22 @@ serve(async (req) => {
 
       if (providedHash !== link.password_hash) {
         console.log('❌ Invalid password for link:', link.id);
+        
+        // For GET requests, redirect back with error
+        if (req.method === 'GET') {
+          const requestUrl = new URL(req.url);
+          const domain = requestUrl.hostname;
+          const protocol = requestUrl.protocol;
+          return new Response(null, {
+            status: 302,
+            headers: {
+              'Location': `${protocol}//${domain}/password/${shortCode}?error=invalid`,
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+            },
+          });
+        }
+        
+        // For POST requests (from React), return JSON with error
         return new Response(JSON.stringify({
           error: 'Invalid password',
           requiresPassword: true
@@ -598,11 +635,25 @@ serve(async (req) => {
       console.log('📊 TRACK-CLICK: Analytics disabled for this link, skipping analytics update');
     }
 
-    // Return redirect information
+    // For GET requests (direct browser access), return HTTP 302 redirect
+    // This makes the redirect instant without any white page or React loading
+    if (req.method === 'GET') {
+      console.log('✅ TRACK-CLICK: Redirecting (GET) to:', link.original_url);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': link.original_url,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      });
+    }
+    
+    // For POST requests (from password form), return JSON with URL
+    // This allows the React app to handle the redirect client-side
+    console.log('✅ TRACK-CLICK: Returning redirect URL (POST):', link.original_url);
     return new Response(JSON.stringify({
-      redirect: true,
-      url: link.original_url,
-      type: link.redirect_type || 'direct'
+      success: true,
+      url: link.original_url
     }), {
       status: 200,
       headers: {
