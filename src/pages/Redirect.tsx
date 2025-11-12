@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, AlertCircle, Lock } from 'lucide-react';
@@ -8,25 +8,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 const Redirect = () => {
   const { shortCode } = useParams<{ shortCode: string }>();
-  const [loading, setLoading] = useState<boolean | null>(null); // null = not started, true = loading, false = done
   const [error, setError] = useState<string | null>(null);
   const [requiresPassword, setRequiresPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const hasProcessedRef = useRef(false);
-  const redirectingRef = useRef(false);
+
+  // Immediate redirect effect - runs synchronously BEFORE paint to prevent white screen
+  useLayoutEffect(() => {
+    if (redirectUrl) {
+      // Inject redirect script immediately in head for instant redirect
+      const script = document.createElement('script');
+      script.textContent = `window.location.replace("${redirectUrl}");`;
+      document.head.appendChild(script);
+      
+      // Also use location.replace as backup
+      window.location.replace(redirectUrl);
+      return;
+    }
+  }, [redirectUrl]);
 
   useEffect(() => {
     const handleRedirect = async () => {
       // Prevent double execution
-      if (hasProcessedRef.current || redirectingRef.current) {
+      if (hasProcessedRef.current) {
         return;
       }
       hasProcessedRef.current = true;
       
       if (!shortCode) {
         setError('Short code is missing.');
-        setLoading(false);
         return;
       }
 
@@ -47,7 +59,6 @@ const Redirect = () => {
               (trackResult.error.message?.includes('non-2xx status code') || 
                trackResult.error.message?.includes('401'))) {
             setRequiresPassword(true);
-            setLoading(false);
             return;
           }
 
@@ -56,25 +67,15 @@ const Redirect = () => {
             if (trackResult.data.requiresPassword) {
               // Link requires password
               setRequiresPassword(true);
-              setLoading(false);
             } else if (trackResult.data.redirect && trackResult.data.url) {
-              // INSTANT redirect using meta refresh for zero-delay redirect
-              redirectingRef.current = true;
-              // Inject meta refresh tag immediately
-              const meta = document.createElement('meta');
-              meta.httpEquiv = 'refresh';
-              meta.content = `0;url=${trackResult.data.url}`;
-              document.head.appendChild(meta);
-              // Also use location.replace as backup
-              window.location.replace(trackResult.data.url);
+              // Set redirect URL - this will trigger immediate redirect via useEffect
+              setRedirectUrl(trackResult.data.url);
               return;
             } else {
               setError('Unexpected response from server.');
-              setLoading(false);
             }
           } else {
             setError('No data received from server.');
-            setLoading(false);
           }
         } catch (trackError: any) {
           // Check if it's a 401 error (password required)
@@ -83,7 +84,6 @@ const Redirect = () => {
               trackError?.message?.includes('401') ||
               trackError?.message?.includes('non-2xx status code')) {
             setRequiresPassword(true);
-            setLoading(false);
             return;
           }
           
@@ -97,66 +97,54 @@ const Redirect = () => {
 
             if (linkError || !link) {
               setError('Link not found.');
-              setLoading(false);
+              return;
+            }
+
+            // Type guard - ensure link has required properties
+            const linkData = link as { original_url?: string; status?: string; expires_at?: string; password_hash?: string };
+            
+            if (!linkData.original_url) {
+              setError('Link not found.');
               return;
             }
 
             // Check if link is active (only if status is explicitly set to inactive)
-            if (link.status && link.status !== 'active') {
+            if (linkData.status && linkData.status !== 'active') {
               setError('Link is inactive.');
-              setLoading(false);
               return;
             }
 
-            if (link.expires_at && new Date(link.expires_at) < new Date()) {
+            if (linkData.expires_at && new Date(linkData.expires_at) < new Date()) {
               setError('Link has expired.');
-              setLoading(false);
               return;
             }
 
             // If password protected, show password form
-            if (link.password_hash) {
+            if (linkData.password_hash) {
               setRequiresPassword(true);
-              setLoading(false);
               return;
             }
 
-            // INSTANT redirect using meta refresh for zero-delay redirect
-            redirectingRef.current = true;
-            // Inject meta refresh tag immediately
-            const meta = document.createElement('meta');
-            meta.httpEquiv = 'refresh';
-            meta.content = `0;url=${link.original_url}`;
-            document.head.appendChild(meta);
-            // Also use location.replace as backup
-            window.location.replace(link.original_url);
+            // Set redirect URL - this will trigger immediate redirect via useEffect
+            setRedirectUrl(linkData.original_url);
             return;
           } catch (fallbackError) {
             setError('Unable to access link. Please try again.');
-            setLoading(false);
           }
         }
       } catch (err) {
         setError('An unexpected error occurred.');
-        setLoading(false);
       }
     };
 
     handleRedirect();
   }, [shortCode]);
 
-  // If we're redirecting, don't render anything
-  if (redirectingRef.current) {
-    return null;
-  }
-
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
-    setLoading(true);
 
     try {
-      console.log('🚀 REDIRECT: Submitting password for short code:', shortCode);
       const trackResult = await supabase.functions.invoke('track-click', {
         body: { code: shortCode, password: password },
         headers: {
@@ -168,19 +156,14 @@ const Redirect = () => {
 
       if (trackResult.data) {
         if (trackResult.data.redirect && trackResult.data.url) {
-          console.log('Password correct, redirecting to:', trackResult.data.url);
-          window.location.href = trackResult.data.url;
+          setRedirectUrl(trackResult.data.url);
         } else if (trackResult.data.error) {
           setPasswordError(trackResult.data.error);
-          setLoading(false);
         }
       } else {
         setPasswordError('Invalid response from server.');
-        setLoading(false);
       }
     } catch (error: any) {
-      console.error('Password submission error:', error);
-      
       // Check if it's still a 401 error (wrong password)
       if (error?.status === 401 || 
           error?.response?.status === 401 || 
@@ -190,15 +173,18 @@ const Redirect = () => {
       } else {
         setPasswordError('Failed to verify password. Please try again.');
       }
-      setLoading(false);
     }
   };
 
-  // Don't show loading screen - only show if we need password or have error
-  // For normal redirects, we redirect immediately without rendering
-  if (loading === null || loading === true) {
-    // Only show loading if we're waiting for password check
-    // For normal redirects, we should have redirected already
+  // If we have a redirect URL, return nothing - redirect happens via useEffect
+  // This prevents any white screen from showing
+  if (redirectUrl) {
+    return null;
+  }
+
+  // While loading (before we know if we need password or error), return nothing
+  // This prevents white screen during API call
+  if (!error && !requiresPassword && !redirectUrl) {
     return null;
   }
 
@@ -224,21 +210,13 @@ const Redirect = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={loading}
                 />
                 {passwordError && (
                   <p className="text-sm text-destructive">{passwordError}</p>
                 )}
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  'Continue'
-                )}
+              <Button type="submit" className="w-full">
+                Continue
               </Button>
             </form>
           </CardContent>
