@@ -244,7 +244,31 @@ export const useLinks = () => {
         }
       });
 
-      if (error) throw error;
+      // Check for Supabase function invocation errors
+      if (error) {
+        console.error('Edge Function invocation error:', error);
+        const errorMessage = error.message || 'Failed to invoke shorten-url function';
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        throw new Error(errorMessage);
+      }
+
+      // Check for errors in the response data
+      if (data?.error) {
+        console.error('Edge Function returned error:', data.error);
+        const errorMessage = typeof data.error === 'string' 
+          ? data.error 
+          : data.error?.message || 'Failed to shorten URL';
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        throw new Error(errorMessage);
+      }
 
       if (data?.success) {
         toast({
@@ -257,15 +281,26 @@ export const useLinks = () => {
         
         return data.data;
       } else {
-        throw new Error(data?.error || 'Failed to shorten URL');
+        // Fallback error if no success flag and no error message
+        const errorMessage = 'Failed to shorten URL. Please try again.';
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('Error shortening URL:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to shorten URL",
-        variant: "destructive",
-      });
+      
+      // Only show toast if we haven't already shown one
+      if (!(error instanceof Error && error.message.includes('Failed to invoke') || error.message.includes('Edge Function returned'))) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to shorten URL",
+          variant: "destructive",
+        });
+      }
       throw error;
     } finally {
       setLoading(false);

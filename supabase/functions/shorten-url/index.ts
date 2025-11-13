@@ -164,13 +164,46 @@ serve(async (req) => {
     }
 
     // Hash password if provided
-    let passwordHash = null;
+    let passwordHash: string | null = null;
     if (password) {
       const encoder = new TextEncoder();
       const data = encoder.encode(password);
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Validate UUID format for channelId and campaignId
+    // UUID regex: 8-4-4-4-12 hexadecimal characters
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    let validatedChannelId: string | null = null;
+    let validatedCampaignId: string | null = null;
+    
+    if (channelId) {
+      if (typeof channelId === 'string' && channelId.trim() !== '') {
+        if (uuidRegex.test(channelId.trim())) {
+          validatedChannelId = channelId.trim();
+        } else {
+          return new Response(
+            JSON.stringify({ error: 'Invalid channel ID format. Channel ID must be a valid UUID.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
+    
+    if (campaignId) {
+      if (typeof campaignId === 'string' && campaignId.trim() !== '') {
+        if (uuidRegex.test(campaignId.trim())) {
+          validatedCampaignId = campaignId.trim();
+        } else {
+          return new Response(
+            JSON.stringify({ error: 'Invalid campaign ID format. Campaign ID must be a valid UUID.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
     }
 
     // Insert link into database
@@ -187,8 +220,8 @@ serve(async (req) => {
         analytics_enabled: analyticsEnabled ?? true,
         title: description,
         description: description,
-        channel_id: channelId,
-        campaign_id: campaignId,
+        channel_id: validatedChannelId,
+        campaign_id: validatedCampaignId,
         custom_alias: customAlias,
         redirect_type: redirectType || 'direct'
       })
@@ -197,8 +230,21 @@ serve(async (req) => {
 
     if (error) {
       console.error('Database error:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to create short link';
+      if (error.message) {
+        if (error.message.includes('invalid input syntax for type uuid')) {
+          errorMessage = 'Invalid channel or campaign ID. Please use a valid UUID format.';
+        } else if (error.message.includes('foreign key constraint')) {
+          errorMessage = 'The specified channel or campaign does not exist.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to create short link', details: error?.message || error }),
+        JSON.stringify({ error: errorMessage, details: error?.message || error }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -236,8 +282,13 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Function error:', error);
+    console.error('Error details:', error.message, error.stack);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        error: 'Internal server error',
+        message: error?.message || 'An unexpected error occurred',
+        details: error?.stack || error
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

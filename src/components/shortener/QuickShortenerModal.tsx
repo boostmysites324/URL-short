@@ -108,6 +108,30 @@ const QuickShortenerModal = ({ isOpen, onClose }: QuickShortenerModalProps) => {
 
       const results = [];
       
+      // Validate UUID format for channelId and campaignId
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (selectedChannel && selectedChannel.trim() !== '') {
+        if (!uuidRegex.test(selectedChannel.trim())) {
+          toast({
+            title: "Invalid Channel ID",
+            description: "Channel ID must be a valid UUID format",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+      
+      if (selectedCampaign && selectedCampaign.trim() !== '') {
+        if (!uuidRegex.test(selectedCampaign.trim())) {
+          toast({
+            title: "Invalid Campaign ID",
+            description: "Campaign ID must be a valid UUID format",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       for (const url of urlList) {
         if (!url.trim()) continue;
 

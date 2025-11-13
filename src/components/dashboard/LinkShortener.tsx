@@ -233,6 +233,30 @@ const LinkShortener = () => {
         }
       }
 
+      // Validate UUID format for channelId and campaignId
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (settings.channelId && settings.channelId.trim() !== '') {
+        if (!uuidRegex.test(settings.channelId.trim())) {
+          toast({
+            title: "Invalid Channel ID",
+            description: "Channel ID must be a valid UUID format (e.g., 123e4567-e89b-12d3-a456-426614174000)",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+      
+      if (settings.campaignId && settings.campaignId.trim() !== '') {
+        if (!uuidRegex.test(settings.campaignId.trim())) {
+          toast({
+            title: "Invalid Campaign ID",
+            description: "Campaign ID must be a valid UUID format (e.g., 123e4567-e89b-12d3-a456-426614174000)",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       if (settings.password && !settings.passwordValue.trim()) {
         toast({
           title: "Password Required",
