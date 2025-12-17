@@ -6,6 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -16,10 +24,79 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const { toast } = useToast();
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = resetEmail.trim();
+    if (!trimmed) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      // Keep login email in sync so user can easily sign in after resetting.
+      setEmail(trimmed);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        toast({
+          title: "Reset failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Security best practice: do not confirm whether an email exists.
+      toast({
+        title: "Check your email",
+        description: "If an account exists for this email, you'll receive a password reset link.",
+      });
+      setResetOpen(false);
+    } catch (err) {
+      toast({
+        title: "Reset failed",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!password) {
+      toast({
+        title: "Password required",
+        description: "Please enter your password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     console.log('Starting login process...');
 
@@ -49,7 +126,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
       
       // Try authentication with timeout
       const authPromise = supabase.auth.signInWithPassword({
-        email,
+        email: trimmedEmail,
         password,
       });
       
@@ -121,6 +198,53 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+          </div>
+          <div className="flex justify-end">
+            <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(email);
+                    setResetOpen(true);
+                  }}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Reset password</DialogTitle>
+                  <DialogDescription>
+                    Enter your email and we’ll send a reset link.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={resetLoading}>
+                    {resetLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send reset link'
+                    )}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? (

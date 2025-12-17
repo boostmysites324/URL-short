@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { useEffect } from "react";
 import Index from "./pages/Index";
@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import AuthPage from "./components/auth/AuthPage";
 import Redirect from "./pages/Redirect";
 import PasswordPage from "./pages/PasswordPage";
+import ResetPassword from "./pages/ResetPassword";
 import Statistics from "./pages/Statistics";
 import GlobalStatistics from "./pages/GlobalStatistics";
 import Archives from "./pages/Archives";
@@ -49,6 +50,7 @@ const FaviconManager = () => {
     // Redirect and password pages will handle their own favicon changes
     const isRedirectRoute = location.pathname.startsWith('/s/') || 
       location.pathname.startsWith('/password/') ||
+      location.pathname.startsWith('/reset-password') ||
       (location.pathname.split('/').filter(Boolean).length === 1 && 
        !['auth', 'statistics', 'archives'].includes(location.pathname.split('/').filter(Boolean)[0] || ''));
     
@@ -75,8 +77,9 @@ const AppRoutes = () => {
     <BrowserRouter>
       <FaviconManager />
       <Routes>
-        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
         <Route path="/password/:shortCode" element={<PasswordPage />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/s/:shortCode" element={<Redirect />} />
         <Route path="/statistics/:linkId" element={<Statistics />} />
         <Route path="/statistics" element={<GlobalStatistics />} />
