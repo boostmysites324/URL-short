@@ -16,6 +16,7 @@ export default function ResetPassword() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // When user clicks the email link, we need to extract the access_token from the hash
@@ -38,12 +39,13 @@ export default function ResetPassword() {
             
             if (error) {
               console.error('Session error:', error);
+              setError(error.message);
               toast({
                 title: "Invalid or expired link",
-                description: "Please request a new password reset email.",
+                description: error.message || "Please request a new password reset email.",
                 variant: "destructive",
               });
-              navigate("/auth", { replace: true });
+              // Don't navigate immediately, let user see the error
               return;
             }
             
@@ -57,24 +59,26 @@ export default function ResetPassword() {
         // If no hash, check if we already have a valid session
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
+          setError("No valid session found. Please request a new password reset email.");
           toast({
             title: "Invalid or expired link",
             description: "Please request a new password reset email.",
             variant: "destructive",
           });
-          navigate("/auth", { replace: true });
+          setTimeout(() => navigate("/auth", { replace: true }), 3000);
           return;
         }
         
         setReady(true);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error initializing reset password:', err);
+        setError(err?.message || "An error occurred. Please try again.");
         toast({
-          title: "Invalid or expired link",
-          description: "Please request a new password reset email.",
+          title: "Error",
+          description: err?.message || "An error occurred. Please try again.",
           variant: "destructive",
         });
-        navigate("/auth", { replace: true });
+        setTimeout(() => navigate("/auth", { replace: true }), 3000);
       }
     };
     void init();
@@ -124,7 +128,28 @@ export default function ResetPassword() {
     }
   };
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Setting up password reset</CardTitle>
+            <CardDescription>Please wait while we verify your reset link...</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            {error ? (
+              <div className="text-center space-y-4">
+                <p className="text-destructive font-medium">{error}</p>
+                <p className="text-sm text-muted-foreground">Redirecting to login page...</p>
+              </div>
+            ) : (
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">

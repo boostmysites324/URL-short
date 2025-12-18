@@ -5,6 +5,26 @@
       "destination": "https://ozkuefljvpzpmbrkknfw.supabase.co/functions/v1/track-click?code=:shortCode"
     },
     {
+      "source": "/reset-password",
+      "destination": "/"
+    },
+    {
+      "source": "/auth",
+      "destination": "/"
+    },
+    {
+      "source": "/statistics/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/archives",
+      "destination": "/"
+    },
+    {
+      "source": "/password/:path*",
+      "destination": "/"
+    },
+    {
       "source": "/:shortCode([a-zA-Z0-9_-]{3,15})",
       "destination": "https://ozkuefljvpzpmbrkknfw.supabase.co/functions/v1/track-click?code=:shortCode"
     },
