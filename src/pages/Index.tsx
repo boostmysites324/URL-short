@@ -18,11 +18,12 @@ const Index = () => {
       
       if (accessToken && type === 'recovery') {
         console.log('Index: Detected recovery link, redirecting to /reset-password');
-        // This is a password reset link - redirect to reset-password page
-        navigate('/reset-password' + location.hash, { replace: true });
+        // Use window.location for immediate, forceful redirect
+        window.location.href = '/reset-password' + location.hash;
+        return;
       }
     }
-  }, [location.hash, navigate]);
+  }, [location.hash]);
 
   return (
     <div className="min-h-screen surface-gradient">

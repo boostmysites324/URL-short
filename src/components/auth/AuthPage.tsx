@@ -18,11 +18,12 @@ const AuthPage = () => {
       
       if (accessToken && type === 'recovery') {
         console.log('AuthPage: Detected recovery link, redirecting to /reset-password');
-        // This is a password reset link - redirect to reset-password page
-        navigate('/reset-password' + location.hash, { replace: true });
+        // Use window.location for immediate, forceful redirect
+        window.location.href = '/reset-password' + location.hash;
+        return;
       }
     }
-  }, [location.hash, navigate]);
+  }, [location.hash]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
