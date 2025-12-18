@@ -18,8 +18,8 @@ const Index = () => {
       
       if (accessToken && type === 'recovery') {
         console.log('Index: Detected recovery link, redirecting to /reset-password');
-        // Use window.location for immediate, forceful redirect
-        window.location.href = '/reset-password' + location.hash;
+        // Use window.location.replace for immediate, forceful redirect (can't go back)
+        window.location.replace('/reset-password' + location.hash);
         return;
       }
     }

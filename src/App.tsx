@@ -62,6 +62,28 @@ const FaviconManager = () => {
   return null;
 };
 
+// Component to intercept recovery links BEFORE routes render
+const RecoveryLinkInterceptor = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    // Check URL hash for recovery link IMMEDIATELY
+    if (location.hash) {
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
+      
+      if (accessToken && type === 'recovery' && location.pathname !== '/reset-password') {
+        console.log('RecoveryLinkInterceptor: Detected recovery link, forcing redirect to /reset-password');
+        // Force immediate redirect - this runs BEFORE any route renders
+        window.location.replace('/reset-password' + location.hash);
+      }
+    }
+  }, [location.hash, location.pathname]);
+  
+  return null;
+};
+
 const AppRoutes = () => {
   const { user, loading } = useAuth();
 
@@ -75,6 +97,7 @@ const AppRoutes = () => {
 
   return (
     <BrowserRouter>
+      <RecoveryLinkInterceptor />
       <FaviconManager />
       <Routes>
         <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
