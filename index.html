@@ -25,6 +25,28 @@
 
   <body>
     <div id="root"></div>
+    <!-- CRITICAL: Catch recovery links BEFORE React loads -->
+    <script>
+      (function() {
+        // Check URL hash for recovery link IMMEDIATELY on page load
+        if (window.location.hash) {
+          try {
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+            const type = params.get('type');
+            
+            if (accessToken && type === 'recovery' && window.location.pathname !== '/reset-password') {
+              console.log('PRE-REACT: Detected recovery link, redirecting to /reset-password');
+              // Force immediate redirect BEFORE React loads
+              window.location.replace('/reset-password' + window.location.hash);
+            }
+          } catch (e) {
+            console.error('Error checking recovery link:', e);
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
