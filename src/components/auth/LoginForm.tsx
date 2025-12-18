@@ -31,6 +31,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent bubbling to parent form
     const trimmed = resetEmail.trim();
     if (!trimmed) {
       toast({
@@ -220,7 +221,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
                     Enter your email and we’ll send a reset link.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleForgotPassword} className="space-y-4">
+                <form onSubmit={handleForgotPassword} className="space-y-4" onClick={(e) => e.stopPropagation()}>
                   <div className="space-y-2">
                     <Label htmlFor="reset-email">Email</Label>
                     <Input
