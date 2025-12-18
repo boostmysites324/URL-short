@@ -295,11 +295,11 @@ export const useLinks = () => {
       
       // Only show toast if we haven't already shown one
       if (!(error instanceof Error && error.message.includes('Failed to invoke') || error.message.includes('Edge Function returned'))) {
-        toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "Failed to shorten URL",
-          variant: "destructive",
-        });
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to shorten URL",
+        variant: "destructive",
+      });
       }
       throw error;
     } finally {

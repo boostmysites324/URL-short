@@ -29,7 +29,7 @@ serve(async (req) => {
       if (req.method === 'POST') {
         const contentType = req.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
-          requestBody = await req.json();
+      requestBody = await req.json();
         }
       }
     } catch (e) {
@@ -263,7 +263,7 @@ serve(async (req) => {
         try {
           const response = await fetch(`http://ip-api.com/json/${normalizedIP}?fields=status,country,countryCode,city,regionName`, {
             signal: controller.signal
-          });
+      });
           clearTimeout(timeout);
           if (response.ok) {
             const geo = await response.json();
@@ -327,7 +327,7 @@ serve(async (req) => {
           };
           console.log('✅ Geolocation success:', geoData);
           break; // Success, stop trying other APIs
-        }
+      }
       } catch (error) {
         console.log('Geolocation API failed, trying next...', error);
         continue; // Try next API
@@ -465,7 +465,7 @@ serve(async (req) => {
     // Enhanced mobile detection (do this before WhatsApp detection)
     let deviceType = 'desktop';
     const userAgentUpper = userAgent.toUpperCase();
-    
+
     if (userAgent.includes('Mobile') || 
         userAgent.includes('Android') ||
         userAgent.includes('iPhone') ||

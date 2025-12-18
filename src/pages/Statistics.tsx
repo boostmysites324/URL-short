@@ -638,7 +638,7 @@ const Statistics = () => {
                           }
                           return null;
                         })()}
-                        <span className="text-lg">{getFlagEmoji(activity.country, activity.country_name)}</span>
+                      <span className="text-lg">{getFlagEmoji(activity.country, activity.country_name)}</span>
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold truncate">
@@ -704,12 +704,12 @@ const Statistics = () => {
                                 )}
                                 {embeddedWebsite && (
                                   <div className="flex items-center gap-1 text-primary">
-                                    <Globe className="w-3 h-3" />
+                            <Globe className="w-3 h-3" />
                                     <span className="font-medium truncate max-w-[180px] sm:max-w-[280px]">
                                       {embeddedWebsite}
                                     </span>
-                                  </div>
-                                )}
+                          </div>
+                        )}
                               </div>
                             );
                           }

@@ -131,7 +131,7 @@ const QuickShortenerModal = ({ isOpen, onClose }: QuickShortenerModalProps) => {
           return;
         }
       }
-
+      
       for (const url of urlList) {
         if (!url.trim()) continue;
 
