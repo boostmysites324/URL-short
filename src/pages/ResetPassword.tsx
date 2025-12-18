@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -17,20 +18,64 @@ export default function ResetPassword() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // When user clicks the email link, Supabase sets a recovery session for this browser.
-    // We just need to ensure there's a session; otherwise we can't update the password.
+    // When user clicks the email link, we need to extract the access_token from the hash
+    // and exchange it for a session before we can update the password.
     const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
+      try {
+        // Check if we have the access_token in the URL hash
+        if (location.hash) {
+          const hashParams = new URLSearchParams(location.hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const type = hashParams.get('type');
+          
+          if (accessToken && type === 'recovery') {
+            // Exchange the token for a session
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || '',
+            });
+            
+            if (error) {
+              console.error('Session error:', error);
+              toast({
+                title: "Invalid or expired link",
+                description: "Please request a new password reset email.",
+                variant: "destructive",
+              });
+              navigate("/auth", { replace: true });
+              return;
+            }
+            
+            // Clear the hash from URL
+            window.history.replaceState(null, '', '/reset-password');
+            setReady(true);
+            return;
+          }
+        }
+        
+        // If no hash, check if we already have a valid session
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          toast({
+            title: "Invalid or expired link",
+            description: "Please request a new password reset email.",
+            variant: "destructive",
+          });
+          navigate("/auth", { replace: true });
+          return;
+        }
+        
+        setReady(true);
+      } catch (err) {
+        console.error('Error initializing reset password:', err);
         toast({
           title: "Invalid or expired link",
           description: "Please request a new password reset email.",
           variant: "destructive",
         });
         navigate("/auth", { replace: true });
-        return;
       }
-      setReady(true);
     };
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
