@@ -62,15 +62,47 @@ export const useLinks = () => {
   const [hasMore, setHasMore] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const { toast } = useToast();
+  
+  // Set up real-time subscription for clicks
+  useEffect(() => {
+    console.log('🔔 Setting up real-time subscriptions for clicks');
+    
+    // Subscribe to clicks table insertions
+    const clicksSubscription = supabase
+      .channel('clicks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'clicks'
+        },
+        (payload) => {
+          console.log('🔔 New click received:', payload);
+          const newClick = payload.new;
+          if (newClick.link_id) {
+            // Update stats for this specific link
+            updateLinkStats(newClick.link_id);
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('🔕 Cleaning up real-time subscriptions');
+      clicksSubscription.unsubscribe();
+    };
+  }, []); // Empty dependency array - set up once on mount
 
   // Function to update individual link statistics
   const updateLinkStats = async (linkId: string) => {
     try {
       const { data: clicksData, error } = await supabase
         .from('clicks')
-        .select('id, ip_address, clicked_at')
+        .select('id, ip_address, created_at')
         .eq('link_id', linkId)
-        .order('clicked_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error(`Error fetching clicks for link ${linkId}:`, error);
@@ -85,14 +117,14 @@ export const useLinks = () => {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const todayClicks = clicksData?.filter(click => 
-        click.clicked_at?.startsWith(today)
+        click.created_at?.startsWith(today)
       ).length || 0;
 
       const yesterdayClicks = clicksData?.filter(click => 
-        click.clicked_at?.startsWith(yesterday)
+        click.created_at?.startsWith(yesterday)
       ).length || 0;
 
-      const lastClickTime = clicksData?.[0]?.clicked_at || null;
+      const lastClickTime = clicksData?.[0]?.created_at || null;
 
       // Update the specific link in the state
       setLinks(prevLinks => 

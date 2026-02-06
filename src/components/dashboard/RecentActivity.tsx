@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, MapPin, Smartphone, Monitor, Globe, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ActivityItem {
   id: string;
@@ -38,53 +39,39 @@ const RecentActivity = ({ linkId, isOpen, onClose }: RecentActivityProps) => {
   const fetchRecentActivity = async () => {
     setLoading(true);
     try {
-      // This would be replaced with actual API call
-      // For now, we'll use mock data
-      const mockActivities: ActivityItem[] = [
-        {
-          id: '1',
-          link_id: linkId,
-          ip_address: '192.168.1.1',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          country: 'India',
-          city: 'Mumbai',
-          device_type: 'Desktop',
-          browser: 'Chrome',
-          os: 'Windows',
-          referrer: 'https://google.com',
-          created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString()
-        },
-        {
-          id: '2',
-          link_id: linkId,
-          ip_address: '192.168.1.2',
-          user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)',
-          country: 'India',
-          city: 'Delhi',
-          device_type: 'Mobile',
-          browser: 'Safari',
-          os: 'iOS',
-          referrer: 'https://facebook.com',
-          created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString()
-        },
-        {
-          id: '3',
-          link_id: linkId,
-          ip_address: '192.168.1.3',
-          user_agent: 'Mozilla/5.0 (Android 11; Mobile; rv:68.0)',
-          country: 'India',
-          city: 'Bangalore',
-          device_type: 'Mobile',
-          browser: 'Firefox',
-          os: 'Android',
-          referrer: 'https://twitter.com',
-          created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString()
-        }
-      ];
+      // Fetch actual click data from database
+      const { data: clicksData, error } = await supabase
+        .from('clicks')
+        .select('*')
+        .eq('link_id', linkId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error fetching recent activity:', error);
+        setActivities([]);
+        return;
+      }
+
+      // Map database fields to component interface
+      const mappedActivities: ActivityItem[] = (clicksData || []).map((click: any) => ({
+        id: click.id,
+        link_id: click.link_id,
+        ip_address: click.ip_address || '',
+        user_agent: click.user_agent || '',
+        country: click.country_name || click.country || 'Unknown',
+        city: click.city || 'Unknown',
+        device_type: click.device_type || 'unknown',
+        browser: click.browser || 'Unknown',
+        os: click.os || 'Unknown',
+        referrer: click.referer || 'Direct',
+        created_at: click.created_at || click.clicked_at || new Date().toISOString()
+      }));
       
-      setActivities(mockActivities);
+      setActivities(mappedActivities);
     } catch (error) {
       console.error('Error fetching recent activity:', error);
+      setActivities([]);
     } finally {
       setLoading(false);
     }

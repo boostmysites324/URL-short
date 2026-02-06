@@ -179,6 +179,31 @@ export default function DailyClicksChart({ from, to, linkId, showMetrics = true 
     };
 
     fetchChartData();
+    
+    // Set up real-time subscription to refresh chart when new clicks arrive
+    console.log('📊 Setting up real-time subscription for chart updates');
+    const subscription = supabase
+      .channel('chart-clicks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'clicks'
+        },
+        (payload) => {
+          console.log('📊 New click received, refreshing chart:', payload);
+          // Refresh chart data when new click is inserted
+          fetchChartData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount or when dependencies change
+    return () => {
+      console.log('📊 Cleaning up chart subscription');
+      subscription.unsubscribe();
+    };
   }, [from, to, linkId]);
 
   if (loading) {
