@@ -12,68 +12,62 @@ export default async function handler(req: Request) {
   }
 
   // Get REAL user IP and geo data from Vercel Edge
-  // These headers contain the actual user's data, not Vercel's server
   const realIP = req.headers.get('x-real-ip') || 
                  req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
                  '';
   const city = req.headers.get('x-vercel-ip-city') || '';
   const country = req.headers.get('x-vercel-ip-country') || '';
   const region = req.headers.get('x-vercel-ip-country-region') || '';
-  const latitude = req.headers.get('x-vercel-ip-latitude') || '';
-  const longitude = req.headers.get('x-vercel-ip-longitude') || '';
 
-  console.log('🚀 Edge Function capturing real user data:', { 
-    realIP, 
-    city: decodeURIComponent(city), 
-    country, 
-    region: decodeURIComponent(region)
-  });
+  console.log('🚀 Edge: Real user:', { realIP, city, country, region });
 
-  // Forward to Supabase Edge Function with real user data
+  // Forward to Supabase Edge Function
   const supabaseUrl = `https://ozkuefljvpzpmbrkknfw.supabase.co/functions/v1/track-click?code=${encodeURIComponent(code)}`;
 
   try {
     const response = await fetch(supabaseUrl, {
       method: 'GET',
-      redirect: 'manual', // CRITICAL: Don't follow redirects, pass them through
+      redirect: 'manual',
       headers: {
-        // Forward real user IP (not Vercel's server IP)
         'x-real-ip': realIP,
         'x-forwarded-for': realIP,
-        // Forward real user geolocation
         'x-vercel-ip-city': city,
         'x-vercel-ip-country': country,
         'x-vercel-ip-country-region': region,
-        'x-vercel-ip-latitude': latitude,
-        'x-vercel-ip-longitude': longitude,
-        // Forward other headers
         'user-agent': req.headers.get('user-agent') || '',
         'referer': req.headers.get('referer') || '',
-        'accept-language': req.headers.get('accept-language') || '',
       },
     });
 
-    // Immediately pass through 302 redirects (don't wait for analytics)
-    if (response.status === 302 || response.status === 301) {
+    console.log('📡 Supabase response status:', response.status);
+
+    // Handle redirects (301, 302)
+    if (response.status === 301 || response.status === 302) {
       const location = response.headers.get('location');
-      if (location) {
-        return new Response(null, {
-          status: response.status,
-          headers: {
-            'Location': location,
-            'Cache-Control': 'no-store, no-cache, must-revalidate',
-          },
-        });
+      console.log('🔀 Redirecting to:', location);
+      
+      if (!location) {
+        console.error('❌ No location header in redirect');
+        return new Response('Missing redirect location', { status: 502 });
       }
+
+      return Response.redirect(location, response.status);
     }
 
-    // Pass through other responses
-    return new Response(response.body, {
+    // Handle other responses (password protected, errors, etc.)
+    const contentType = response.headers.get('content-type') || 'text/plain';
+    const body = await response.text();
+    
+    console.log('📄 Non-redirect response:', { status: response.status, contentType, bodyLength: body.length });
+
+    return new Response(body, {
       status: response.status,
-      headers: response.headers,
+      headers: {
+        'Content-Type': contentType,
+      },
     });
   } catch (error) {
-    console.error('Edge function error:', error);
-    return new Response('Redirect failed', { status: 500 });
+    console.error('❌ Edge function error:', error);
+    return new Response('Redirect failed: ' + (error as Error).message, { status: 500 });
   }
 }
