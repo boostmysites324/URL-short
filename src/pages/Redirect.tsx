@@ -260,13 +260,35 @@ const Redirect = () => {
   // If we have a redirect URL, return transparent div - redirect happens via useLayoutEffect
   // This prevents any white screen from showing, browser loader will show instead
   if (redirectUrl) {
-    return <div style={{ backgroundColor: 'transparent', width: '100%', height: '100vh', margin: 0, padding: 0 }} />;
+    return (
+      <div
+        style={{
+          backgroundColor: '#0b0f1a',
+          colorScheme: 'dark',
+          width: '100%',
+          height: '100vh',
+          margin: 0,
+          padding: 0,
+        }}
+      />
+    );
   }
 
   // While loading (before we know if we need password or error), return transparent div
   // This prevents white screen during API call, browser loader will show
   if (!error && !requiresPassword && !redirectUrl) {
-    return <div style={{ backgroundColor: 'transparent', width: '100%', height: '100vh', margin: 0, padding: 0 }} />;
+    return (
+      <div
+        style={{
+          backgroundColor: '#0b0f1a',
+          colorScheme: 'dark',
+          width: '100%',
+          height: '100vh',
+          margin: 0,
+          padding: 0,
+        }}
+      />
+    );
   }
 
   if (requiresPassword) {
