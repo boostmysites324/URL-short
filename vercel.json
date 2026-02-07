@@ -1,17 +1,17 @@
 {
-  "redirects": [
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
     {
       "source": "/s/:shortCode",
-      "destination": "/api/s/:shortCode",
-      "permanent": false
+      "destination": "/api/s/:shortCode"
     },
     {
       "source": "/:shortCode([a-zA-Z0-9_-]{3,15})",
-      "destination": "/api/s/:shortCode",
-      "permanent": false
-    }
-  ],
-  "rewrites": [
+      "destination": "/api/s/:shortCode"
+    },
     {
       "source": "/reset-password",
       "destination": "/"
