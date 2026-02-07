@@ -146,21 +146,33 @@ serve(async (req) => {
       );
     }
 
-    // Generate short URL with custom domain or default
-    // Use production domain 247l.ink by default
-    let domain = 'https://247l.ink';
+    // Generate short URL with custom domain or auto-detect from request
+    let domain = '';
     let shortUrl = '';
     
     if (customDomain) {
       // Use custom domain if provided and valid
       domain = `https://${customDomain}`;
-      // Route through our SPA redirect page so custom domains work
       shortUrl = `${domain}/s/${shortCode}`;
       console.log('Using custom domain:', domain);
     } else {
-      // Use default production domain
+      // Auto-detect domain from request origin or referer
+      const origin = req.headers.get('origin') || req.headers.get('referer');
+      if (origin) {
+        try {
+          const originUrl = new URL(origin);
+          domain = `${originUrl.protocol}//${originUrl.hostname}`;
+          console.log('Using detected domain from origin:', domain);
+        } catch (e) {
+          domain = 'https://247l.ink';
+          console.log('Failed to parse origin, using fallback domain:', domain);
+        }
+      } else {
+        domain = 'https://247l.ink';
+        console.log('No origin/referer header, using fallback domain:', domain);
+      }
       shortUrl = `${domain}/s/${shortCode}`;
-      console.log('Using default domain:', domain);
+      console.log('Using auto-detected domain:', domain);
     }
 
     // Hash password if provided

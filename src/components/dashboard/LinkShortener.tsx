@@ -36,11 +36,11 @@ const LinkShortener = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [settings, setSettings] = useState({
-    customDomain: true,
+    customDomain: false, // Auto-detect domain from request
     analytics: true,
     expiration: false,
     password: false,
-    customDomainUrl: "247l.ink",
+    customDomainUrl: typeof window !== 'undefined' ? window.location.hostname : "247l.ink",
     expirationDate: undefined as Date | undefined,
     passwordValue: "",
     customAlias: "",
@@ -51,7 +51,7 @@ const LinkShortener = () => {
     domainValidation: {
       isValid: true,
       isChecking: false,
-      message: "Using fixed domain 247l.ink"
+      message: typeof window !== 'undefined' ? `Using current domain: ${window.location.hostname}` : "Using auto-detected domain"
     }
   });
   const [showShortLinkModal, setShowShortLinkModal] = useState(false);
