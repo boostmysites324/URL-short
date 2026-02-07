@@ -171,8 +171,9 @@ serve(async (req) => {
         domain = 'https://247l.ink';
         console.log('No origin/referer header, using fallback domain:', domain);
       }
-      shortUrl = `${domain}/s/${shortCode}`;
-      console.log('Using auto-detected domain:', domain);
+      // Use /api/s/ path for instant server-side redirect (no SPA loading)
+      shortUrl = `${domain}/api/s/${shortCode}`;
+      console.log('Using auto-detected domain with /api/s/ path:', domain);
     }
 
     // Hash password if provided
