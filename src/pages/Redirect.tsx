@@ -120,21 +120,25 @@ const Redirect = () => {
             return;
           }
 
-          // The track-click function returns JSON with redirect info
+          // The track-click function can return different shapes:
+          // - { redirect: true, url }
+          // - { success: true, url }
+          // - { requiresPassword: true }
           if (trackResult.data) {
             if (trackResult.data.requiresPassword) {
-              // Link requires password
               setRequiresPassword(true);
-            } else if (trackResult.data.redirect && trackResult.data.url) {
-              // Set favicon immediately when we get the redirect URL
-              const domain = getDomainFromUrl(trackResult.data.url);
-              if (domain) {
-                setFavicon(trackResult.data.url);
-              }
-              // Set redirect URL - this will trigger immediate redirect via useEffect
-              setRedirectUrl(trackResult.data.url);
-              return;
             } else {
+              const redirectUrl = trackResult.data.url || trackResult.data.redirectUrl;
+              const shouldRedirect = trackResult.data.redirect || trackResult.data.success || !!redirectUrl;
+
+              if (shouldRedirect && redirectUrl) {
+                const domain = getDomainFromUrl(redirectUrl);
+                if (domain) {
+                  setFavicon(redirectUrl);
+                }
+                setRedirectUrl(redirectUrl);
+                return;
+              }
               setError('Unexpected response from server.');
             }
           } else {
@@ -223,15 +227,19 @@ const Redirect = () => {
       });
 
       if (trackResult.data) {
-        if (trackResult.data.redirect && trackResult.data.url) {
-          // Set favicon when password is correct
-          const domain = getDomainFromUrl(trackResult.data.url);
+        const redirectUrl = trackResult.data.url || trackResult.data.redirectUrl;
+        const shouldRedirect = trackResult.data.redirect || trackResult.data.success || !!redirectUrl;
+
+        if (shouldRedirect && redirectUrl) {
+          const domain = getDomainFromUrl(redirectUrl);
           if (domain) {
-            setFavicon(trackResult.data.url);
+            setFavicon(redirectUrl);
           }
-          setRedirectUrl(trackResult.data.url);
+          setRedirectUrl(redirectUrl);
         } else if (trackResult.data.error) {
           setPasswordError(trackResult.data.error);
+        } else {
+          setPasswordError('Invalid response from server.');
         }
       } else {
         setPasswordError('Invalid response from server.');
