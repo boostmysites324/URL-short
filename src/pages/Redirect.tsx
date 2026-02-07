@@ -261,33 +261,30 @@ const Redirect = () => {
   // This prevents any white screen from showing, browser loader will show instead
   if (redirectUrl) {
     return (
-      <div
-        style={{
-          backgroundColor: '#0b0f1a',
-          colorScheme: 'dark',
-          width: '100%',
-          height: '100vh',
-          margin: 0,
-          padding: 0,
-        }}
-      />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0b0f1a' }}>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="relative">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+            <div className="absolute inset-0 blur-xl bg-blue-500/20 animate-pulse"></div>
+          </div>
+          <p className="text-sm text-slate-300 animate-pulse">Redirecting...</p>
+        </div>
+      </div>
     );
   }
 
-  // While loading (before we know if we need password or error), return transparent div
-  // This prevents white screen during API call, browser loader will show
+  // While loading (before we know if we need password or error), show loader
   if (!error && !requiresPassword && !redirectUrl) {
     return (
-      <div
-        style={{
-          backgroundColor: '#0b0f1a',
-          colorScheme: 'dark',
-          width: '100%',
-          height: '100vh',
-          margin: 0,
-          padding: 0,
-        }}
-      />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0b0f1a' }}>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="relative">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+            <div className="absolute inset-0 blur-xl bg-blue-500/20 animate-pulse"></div>
+          </div>
+          <p className="text-sm text-slate-300 animate-pulse">Loading...</p>
+        </div>
+      </div>
     );
   }
 
